@@ -7,6 +7,7 @@ export interface CompositionSource {
   variant: AssetVariant;
   width: number;
   height: number;
+  emphasis?: "primary" | "secondary";
 }
 
 export interface CompositionItem {
@@ -61,10 +62,14 @@ export function createRowComposition(
       throw new Error("Invalid source dimensions");
     }
 
-    const scale = Math.min(
-      cellWidth / source.width,
-      maxHeight / source.height
-    );
+  const fitScale = Math.min(
+    cellWidth / source.width,
+    maxHeight / source.height
+  );
+
+    const emphasisScale = source.emphasis === "secondary" ? 0.55 : 1;
+
+    const scale = fitScale * emphasisScale;
 
     const scaledWidth = source.width * scale;
     const scaledHeight = source.height * scale;

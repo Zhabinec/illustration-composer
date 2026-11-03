@@ -74,4 +74,19 @@ describe("Row composition", () => {
     expect(() => createRowComposition(1200, 800, invalid))
       .toThrow("Invalid source dimensions");
   });
+
+  it("scales secondary objects without affecting primary", () => {
+  const primaryScene = createRowComposition(1200, 800, sources);
+
+  const secondaryScene = createRowComposition(1200, 800, [
+    sources[0]!,
+    { ...sources[1]!, emphasis: "secondary" }
+  ]);
+
+    expect(secondaryScene.items[0]!.scale)
+      .toBeCloseTo(primaryScene.items[0]!.scale);
+
+    expect(secondaryScene.items[1]!.scale)
+      .toBeCloseTo(primaryScene.items[1]!.scale * 0.55);
+    });
 });

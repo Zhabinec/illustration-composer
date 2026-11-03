@@ -34,8 +34,8 @@ async function main(): Promise<void> {
     const adapter = new FigmaAssetAdapter(catalog, index);
 
     const selections = [
-      { assetId: "book", size: "L" },
-      { assetId: "pen", size: "S" }
+      { assetId: "book", size: "L", emphasis: "primary" },
+      { assetId: "pen", size: "S", emphasis: "secondary" }
     ] as const;
 
     const sources: CompositionSource[] = [];
@@ -66,7 +66,8 @@ async function main(): Promise<void> {
       sources.push({
         assetId: asset.id,
         variant,
-        ...dimensions
+        ...dimensions,
+        emphasis: selection.emphasis
       });
     }
 
