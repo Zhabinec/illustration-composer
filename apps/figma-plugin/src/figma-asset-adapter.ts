@@ -44,25 +44,44 @@ export class FigmaAssetAdapter {
     }
   }
 
-  async cloneInto(
-    resourceKey: string,
-    target: FrameNode
-  ): Promise<GroupNode> {
+    
+  private async getSource(resourceKey: string): Promise<GroupNode> {
     const nodeId = this.nodeIds.get(resourceKey);
 
     if (!nodeId) {
       throw new Error(`Unknown resource: ${resourceKey}`);
     }
 
-    const source = await figma.getNodeByIdAsync(nodeId);
+    const node = await figma.getNodeByIdAsync(nodeId);
 
-    if (!source || source.type !== "GROUP") {
+    if (!node || node.type !== "GROUP") {
       throw new Error(`Source group not found: ${resourceKey}`);
     }
 
+    return node;
+  }
+
+  async getDimensions(
+    resourceKey: string
+  ): Promise<{ width: number; height: number }> {
+    const source = await this.getSource(resourceKey);
+
+    return {
+      width: source.width,
+      height: source.height
+    };
+  }
+
+  async cloneInto(
+    resourceKey: string,
+    target: FrameNode
+  ): Promise<GroupNode> {
+    const source = await this.getSource(resourceKey);
     const copy = source.clone();
+
     target.appendChild(copy);
 
     return copy;
   }
+
 }

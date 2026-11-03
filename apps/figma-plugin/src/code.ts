@@ -1,4 +1,11 @@
 
+import {
+  AssetId,
+  createRowComposition,
+  findAssetVariant
+} from "@illustration-composer/core";
+import type { CompositionSource } from "@illustration-composer/core";
+
 import { FigmaLibraryScanner } from "./figma-library-scanner.js";
 import { suggestAssetNames } from "./figma-asset-matcher.js";
 import { resolveLibrary } from "./figma-library-resolver.js";
@@ -26,6 +33,45 @@ async function main(): Promise<void> {
     const catalog = createAssetCatalog(index);
     const adapter = new FigmaAssetAdapter(catalog, index);
 
+    const selections = [
+      { assetId: "book", size: "L" },
+      { assetId: "pen", size: "S" }
+    ] as const;
+
+    const sources: CompositionSource[] = [];
+
+    for (const selection of selections) {
+      const asset = catalog.getById(
+        AssetId.create(selection.assetId)
+      );
+
+      if (!asset) {
+        throw new Error(`Asset not found: ${selection.assetId}`);
+      }
+
+      const variant = findAssetVariant(
+        asset,
+        selection.size,
+        "main"
+      );
+
+      if (!variant) {
+        throw new Error(`Variant not found: ${selection.assetId}`);
+      }
+
+      const dimensions = await adapter.getDimensions(
+        variant.resourceKey
+      );
+
+      sources.push({
+        assetId: asset.id,
+        variant,
+        ...dimensions
+      });
+    }
+
+    const scene = createRowComposition(1200, 800, sources);
+
     const previewPage = figma.root.children.find(
       page => page.name === "Composer Preview"
     ) ?? figma.createPage();
@@ -34,8 +80,8 @@ async function main(): Promise<void> {
     await figma.setCurrentPageAsync(previewPage);
 
     const frame = figma.createFrame();
-    frame.name = "Pen - S - Indexed";
-    frame.resize(600, 400);
+    frame.name = "Composition - Book + Pen";
+    frame.resize(scene.width, scene.height);
 
     const maxX = previewPage.children
       .filter(node => node.id !== frame.id)
@@ -46,20 +92,30 @@ async function main(): Promise<void> {
 
     frame.x = maxX + 100;
 
-    const copy = await adapter.cloneInto("pen/main/s", frame);
+    for (const item of scene.items) {
+      const copy = await adapter.cloneInto(
+        item.variant.resourceKey,
+        frame
+      );
 
-    copy.x = (frame.width - copy.width) / 2;
-    copy.y = (frame.height - copy.height) / 2;
+      copy.rescale(item.scale);
+      copy.rotation = item.rotation;
+      copy.x = item.x;
+      copy.y = item.y;
+    }
 
     figma.viewport.scrollAndZoomIntoView([frame]);
 
-    console.log("Composer initialized:", {
-      assets: catalog.getAll().length,
-      unresolved: resolution.unresolved.length,
-      clonedResource: "pen/main/s"
+    console.log("Composition created:", {
+      width: scene.width,
+      height: scene.height,
+      items: scene.items.length,
+      resources: scene.items.map(
+        item => item.variant.resourceKey
+      )
     });
 
-    figma.notify("Illustration Composer initialized");
+    figma.notify("Composition created");
   } catch (error) {
     console.error("Illustration Composer failed:", error);
     figma.notify("Illustration Composer failed");
