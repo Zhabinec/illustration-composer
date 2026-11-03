@@ -1,81 +1,66 @@
 
-type AssetRole = "main" | "background";
-type AssetSize = "s" | "l";
+import { AssetCatalog } from "@illustration-composer/core";
+import type { IndexedAsset } from "./figma-asset-index.js";
 
 export class FigmaAssetAdapter {
-  private readonly names: Record<string, readonly string[]> = {
-    book: ["Книга"]
-  };
+  private readonly nodeIds = new Map<string, string>();
 
-  constructor(private readonly library: PageNode) {}
-
-  find(resourceKey: string): GroupNode {
-    const parts = resourceKey.split("/");
-
-    if (parts.length !== 3) {
-      throw new Error(`Invalid resource key: ${resourceKey}`);
-    }
-
-    const [assetId, role, size] = parts;
-
-    if (
-      !assetId ||
-      (role !== "main" && role !== "background") ||
-      (size !== "s" && size !== "l")
-    ) {
-      throw new Error(`Invalid resource key: ${resourceKey}`);
-    }
-
-    const names = this.names[assetId];
-
-    if (!names) {
-      throw new Error(`Unknown asset: ${assetId}`);
-    }
-
-    const section = this.library.children.find(
-      node =>
-        node.type === "SECTION" &&
-        node.name === `Размер ${size.toUpperCase()}`
+  constructor(
+    catalog: AssetCatalog,
+    index: readonly IndexedAsset[]
+  ) {
+    const indexedAssets = new Map(
+      index.map(asset => [asset.name, asset])
     );
 
-    if (!section || section.type !== "SECTION") {
-      throw new Error(`Section not found: ${size}`);
+    for (const asset of catalog.getAll()) {
+      const indexed = indexedAssets.get(asset.name);
+
+      if (!indexed) {
+        throw new Error(`Asset not indexed: ${asset.name}`);
+      }
+
+      for (const variant of asset.variants) {
+        const match = indexed.variants.find(
+          item =>
+            item.size === variant.size &&
+            item.role === variant.role
+        );
+
+        if (!match) {
+          throw new Error(
+            `Variant not found: ${variant.resourceKey}`
+          );
+        }
+
+        if (this.nodeIds.has(variant.resourceKey)) {
+          throw new Error(
+            `Duplicate resource: ${variant.resourceKey}`
+          );
+        }
+
+        this.nodeIds.set(variant.resourceKey, match.nodeId);
+      }
     }
-
-    const backgroundLabel = section.children.find(
-      node =>
-        node.type === "TEXT" &&
-        node.name === "Фоновые объекты"
-    );
-
-    if (!backgroundLabel) {
-      throw new Error("Background label not found");
-    }
-
-    const matches = section.children.filter(
-      (node): node is GroupNode =>
-        node.type === "GROUP" &&
-        names.includes(node.name) &&
-        (
-          role === "main"
-            ? node.y < backgroundLabel.y
-            : node.y > backgroundLabel.y
-        )
-    );
-
-    if (matches.length !== 1) {
-      throw new Error(
-        `Expected one resource for ${resourceKey}, found ${matches.length}`
-      );
-    }
-
-    return matches[0]!;
   }
 
-  cloneInto(resourceKey: string, target: FrameNode): GroupNode {
-    const source = this.find(resourceKey);
-    const copy = source.clone();
+  async cloneInto(
+    resourceKey: string,
+    target: FrameNode
+  ): Promise<GroupNode> {
+    const nodeId = this.nodeIds.get(resourceKey);
 
+    if (!nodeId) {
+      throw new Error(`Unknown resource: ${resourceKey}`);
+    }
+
+    const source = await figma.getNodeByIdAsync(nodeId);
+
+    if (!source || source.type !== "GROUP") {
+      throw new Error(`Source group not found: ${resourceKey}`);
+    }
+
+    const copy = source.clone();
     target.appendChild(copy);
 
     return copy;
