@@ -3,7 +3,8 @@ import {
   AssetId,
   createFocusComposition,
   createRowComposition,
-  findAssetVariant
+  findAssetVariant,
+  resolvePalette
 } from "@illustration-composer/core";
 
 import type { CompositionSource } from "@illustration-composer/core";
@@ -15,6 +16,12 @@ import { indexResolvedAssets } from "./figma-asset-index.js";
 import { createAssetCatalog } from "./figma-catalog-factory.js";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
+
+const canvasPresets = {
+  landscape: { width: 1200, height: 800 },
+  square: { width: 1000, height: 1000 },
+  portrait: { width: 800, height: 1200 }
+} as const;
 
 async function main(): Promise<void> {
   try {
@@ -40,7 +47,7 @@ async function main(): Promise<void> {
 
     figma.showUI(__html__, {
       width: 340,
-      height: 370,
+      height: 560,
       themeColors: true
     });
 
@@ -55,9 +62,16 @@ async function main(): Promise<void> {
         !("primaryId" in message) ||
         !("secondaryId" in message) ||
         !("layout" in message) ||
+        !("format" in message) ||
+        !("palette" in message) ||
         typeof message.primaryId !== "string" ||
         typeof message.secondaryId !== "string" ||
         (message.layout !== "focus" && message.layout !== "row") ||
+        (
+          message.format !== "landscape" &&
+          message.format !== "square" &&
+          message.format !== "portrait"
+        ) ||
         isCreating
       ) {
         return;
@@ -66,6 +80,9 @@ async function main(): Promise<void> {
       isCreating = true;
 
       try {
+        const palette = resolvePalette(message.palette);
+        const canvas = canvasPresets[message.format];
+
         const selections = [
           {
             id: message.primaryId,
@@ -122,8 +139,17 @@ async function main(): Promise<void> {
         }
 
         const scene = message.layout === "row"
-          ? createRowComposition(1200, 800, sources)
-          : createFocusComposition(1200, 800, primary, secondary);
+          ? createRowComposition(
+              canvas.width,
+              canvas.height,
+              sources
+            )
+          : createFocusComposition(
+              canvas.width,
+              canvas.height,
+              primary,
+              secondary
+            );
 
         const previewPage = figma.root.children.find(
           page => page.name === "Composer Preview"
@@ -139,7 +165,8 @@ async function main(): Promise<void> {
 
         const frame = await renderer.render(
           scene,
-          `${layoutName} - ${names.join(" + ")}`
+          `${layoutName} - ${names.join(" + ")} - ${canvas.width}x${canvas.height}`,
+          palette
         );
 
         figma.viewport.scrollAndZoomIntoView([frame]);
@@ -150,6 +177,8 @@ async function main(): Promise<void> {
 
         console.log("Composition created:", {
           layout: message.layout,
+          format: message.format,
+          palette: palette.name,
           objects: names,
           width: scene.width,
           height: scene.height

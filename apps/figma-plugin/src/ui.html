@@ -32,13 +32,19 @@
       color: inherit;
     }
 
+    input[type="file"] {
+      width: 100%;
+      margin-bottom: 16px;
+      color: inherit;
+    }
+
     button {
       width: 100%;
       padding: 10px;
       border: 0;
       border-radius: 6px;
       background: var(--figma-color-bg-brand, #0d99ff);
-      color: var(--figma-color-text-onbrand, white);
+      color: var(--figma-color-text-onbrand, #fff);
       cursor: pointer;
     }
 
@@ -68,7 +74,30 @@
     <option value="row">Row — в ряд</option>
   </select>
 
-  <button id="create" disabled>Создать композицию</button>
+  <label for="format">Формат холста</label>
+  <select id="format">
+    <option value="landscape">Горизонтальный — 1200 × 800</option>
+    <option value="square">Квадратный — 1000 × 1000</option>
+    <option value="portrait">Вертикальный — 800 × 1200</option>
+  </select>
+
+  <label for="palette">Цветовая палитра</label>
+  <select id="palette">
+    <option value="original">Фиолетовая</option>
+    <option value="mint">Мятная</option>
+    <option value="peach">Персиковая</option>
+  </select>
+
+  <label for="palette-file">Загрузить свою палитру (JSON)</label>
+  <input
+    id="palette-file"
+    type="file"
+    accept=".json,application/json"
+  >
+
+  <button id="create" disabled>
+    Создать композицию
+  </button>
 
   <p id="status">Загрузка каталога...</p>
 
@@ -76,8 +105,13 @@
     const primary = document.getElementById("primary");
     const secondary = document.getElementById("secondary");
     const layout = document.getElementById("layout");
+    const format = document.getElementById("format");
+    const palette = document.getElementById("palette");
+    const paletteFile = document.getElementById("palette-file");
     const button = document.getElementById("create");
-    const status = document.getElementById("status");
+    const statusElement = document.getElementById("status");
+
+    let customPalette = null;
 
     function fillSelect(select, assets) {
       select.replaceChildren();
@@ -92,16 +126,76 @@
       }
     }
 
+    paletteFile.onchange = async () => {
+      const file = paletteFile.files[0];
+
+      if (!file) {
+        return;
+      }
+
+      try {
+        if (file.size > 16384) {
+          throw new Error("Файл палитры слишком большой");
+        }
+
+        const data = JSON.parse(await file.text());
+
+        if (
+          !data ||
+          typeof data !== "object" ||
+          Array.isArray(data) ||
+          typeof data.name !== "string" ||
+          !data.name.trim()
+        ) {
+          throw new Error("Некорректный файл палитры");
+        }
+
+        const previousOption = palette.querySelector(
+          'option[value="custom"]'
+        );
+
+        if (previousOption) {
+          previousOption.remove();
+        }
+
+        const option = document.createElement("option");
+        option.value = "custom";
+        option.textContent = data.name;
+
+        palette.appendChild(option);
+
+        customPalette = data;
+        palette.value = "custom";
+
+        statusElement.textContent = "Палитра загружена";
+      } catch (error) {
+        customPalette = null;
+        palette.value = "original";
+
+        statusElement.textContent = error instanceof Error
+          ? error.message
+          : String(error);
+      }
+    };
+
     button.onclick = () => {
+      if (!primary.value || !secondary.value) {
+        return;
+      }
+
       button.disabled = true;
-      status.textContent = "Создаём композицию...";
+      statusElement.textContent = "Создаём композицию...";
 
       parent.postMessage({
         pluginMessage: {
           type: "create",
           primaryId: primary.value,
           secondaryId: secondary.value,
-          layout: layout.value
+          layout: layout.value,
+          format: format.value,
+          palette: palette.value === "custom"
+            ? customPalette
+            : palette.value
         }
       }, "*");
     };
@@ -109,7 +203,9 @@
     window.onmessage = event => {
       const message = event.data.pluginMessage;
 
-      if (!message) return;
+      if (!message) {
+        return;
+      }
 
       if (message.type === "ready") {
         fillSelect(primary, message.assets);
@@ -118,21 +214,28 @@
         primary.value = "wallet";
         secondary.value = "coin";
 
-        if (!primary.value) primary.selectedIndex = 0;
-        if (!secondary.value) secondary.selectedIndex = 0;
+        if (!primary.value) {
+          primary.selectedIndex = 0;
+        }
+
+        if (!secondary.value) {
+          secondary.selectedIndex = 0;
+        }
 
         button.disabled = !primary.value || !secondary.value;
-        status.textContent = `Доступно объектов: ${message.assets.length}`;
+
+        statusElement.textContent =
+          `Доступно объектов: ${message.assets.length}`;
       }
 
       if (message.type === "created") {
         button.disabled = false;
-        status.textContent = "Композиция создана";
+        statusElement.textContent = "Композиция создана";
       }
 
       if (message.type === "error") {
         button.disabled = false;
-        status.textContent = message.message;
+        statusElement.textContent = message.message;
       }
     };
   </script>
