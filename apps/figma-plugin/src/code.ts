@@ -1,9 +1,11 @@
 
 import {
   AssetId,
+  createFocusComposition,
   createRowComposition,
   findAssetVariant
 } from "@illustration-composer/core";
+
 import type { CompositionSource } from "@illustration-composer/core";
 
 import { FigmaLibraryScanner } from "./figma-library-scanner.js";
@@ -12,6 +14,7 @@ import { resolveLibrary } from "./figma-library-resolver.js";
 import { indexResolvedAssets } from "./figma-asset-index.js";
 import { createAssetCatalog } from "./figma-catalog-factory.js";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
+import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
 
 async function main(): Promise<void> {
   try {
@@ -31,96 +34,150 @@ async function main(): Promise<void> {
     const resolution = resolveLibrary(assets, suggestions);
     const index = indexResolvedAssets(resolution.resolved);
     const catalog = createAssetCatalog(index);
+
     const adapter = new FigmaAssetAdapter(catalog, index);
+    const renderer = new FigmaSceneRenderer(adapter);
 
-    const selections = [
-      { assetId: "book", size: "L", emphasis: "primary" },
-      { assetId: "pen", size: "S", emphasis: "secondary" }
-    ] as const;
-
-    const sources: CompositionSource[] = [];
-
-    for (const selection of selections) {
-      const asset = catalog.getById(
-        AssetId.create(selection.assetId)
-      );
-
-      if (!asset) {
-        throw new Error(`Asset not found: ${selection.assetId}`);
-      }
-
-      const variant = findAssetVariant(
-        asset,
-        selection.size,
-        "main"
-      );
-
-      if (!variant) {
-        throw new Error(`Variant not found: ${selection.assetId}`);
-      }
-
-      const dimensions = await adapter.getDimensions(
-        variant.resourceKey
-      );
-
-      sources.push({
-        assetId: asset.id,
-        variant,
-        ...dimensions,
-        emphasis: selection.emphasis
-      });
-    }
-
-    const scene = createRowComposition(1200, 800, sources);
-
-    const previewPage = figma.root.children.find(
-      page => page.name === "Composer Preview"
-    ) ?? figma.createPage();
-
-    previewPage.name = "Composer Preview";
-    await figma.setCurrentPageAsync(previewPage);
-
-    const frame = figma.createFrame();
-    frame.name = "Composition - Book + Pen";
-    frame.resize(scene.width, scene.height);
-
-    const maxX = previewPage.children
-      .filter(node => node.id !== frame.id)
-      .reduce(
-        (max, node) => Math.max(max, node.x + node.width),
-        0
-      );
-
-    frame.x = maxX + 100;
-
-    for (const item of scene.items) {
-      const copy = await adapter.cloneInto(
-        item.variant.resourceKey,
-        frame
-      );
-
-      copy.rescale(item.scale);
-      copy.rotation = item.rotation;
-      copy.x = item.x;
-      copy.y = item.y;
-    }
-
-    figma.viewport.scrollAndZoomIntoView([frame]);
-
-    console.log("Composition created:", {
-      width: scene.width,
-      height: scene.height,
-      items: scene.items.length,
-      resources: scene.items.map(
-        item => item.variant.resourceKey
-      )
+    figma.showUI(__html__, {
+      width: 340,
+      height: 370,
+      themeColors: true
     });
 
-    figma.notify("Composition created");
+    let isCreating = false;
+
+    figma.ui.onmessage = async (message: unknown): Promise<void> => {
+      if (
+        typeof message !== "object" ||
+        message === null ||
+        !("type" in message) ||
+        message.type !== "create" ||
+        !("primaryId" in message) ||
+        !("secondaryId" in message) ||
+        !("layout" in message) ||
+        typeof message.primaryId !== "string" ||
+        typeof message.secondaryId !== "string" ||
+        (message.layout !== "focus" && message.layout !== "row") ||
+        isCreating
+      ) {
+        return;
+      }
+
+      isCreating = true;
+
+      try {
+        const selections = [
+          {
+            id: message.primaryId,
+            size: "L",
+            emphasis: "primary"
+          },
+          {
+            id: message.secondaryId,
+            size: "S",
+            emphasis: "secondary"
+          }
+        ] as const;
+
+        const sources: CompositionSource[] = [];
+        const names: string[] = [];
+
+        for (const selection of selections) {
+          const asset = catalog.getById(
+            AssetId.create(selection.id)
+          );
+
+          if (!asset) {
+            throw new Error(`Asset not found: ${selection.id}`);
+          }
+
+          const variant = findAssetVariant(
+            asset,
+            selection.size,
+            "main"
+          );
+
+          if (!variant) {
+            throw new Error(`Variant not found: ${selection.id}`);
+          }
+
+          const dimensions = await adapter.getDimensions(
+            variant.resourceKey
+          );
+
+          sources.push({
+            assetId: asset.id,
+            variant,
+            ...dimensions,
+            emphasis: selection.emphasis
+          });
+
+          names.push(asset.name);
+        }
+
+        const [primary, secondary] = sources;
+
+        if (!primary || !secondary) {
+          throw new Error("Two objects are required");
+        }
+
+        const scene = message.layout === "row"
+          ? createRowComposition(1200, 800, sources)
+          : createFocusComposition(1200, 800, primary, secondary);
+
+        const previewPage = figma.root.children.find(
+          page => page.name === "Composer Preview"
+        ) ?? figma.createPage();
+
+        previewPage.name = "Composer Preview";
+
+        await figma.setCurrentPageAsync(previewPage);
+
+        const layoutName = message.layout === "row"
+          ? "Row"
+          : "Focus";
+
+        const frame = await renderer.render(
+          scene,
+          `${layoutName} - ${names.join(" + ")}`
+        );
+
+        figma.viewport.scrollAndZoomIntoView([frame]);
+
+        figma.ui.postMessage({
+          type: "created"
+        });
+
+        console.log("Composition created:", {
+          layout: message.layout,
+          objects: names,
+          width: scene.width,
+          height: scene.height
+        });
+      } catch (error) {
+        console.error("Composition failed:", error);
+
+        figma.ui.postMessage({
+          type: "error",
+          message: error instanceof Error
+            ? error.message
+            : String(error)
+        });
+      } finally {
+        isCreating = false;
+      }
+    };
+
+    figma.ui.postMessage({
+      type: "ready",
+      assets: catalog.getAll().map(asset => ({
+        id: asset.id.value,
+        name: asset.name
+      }))
+    });
   } catch (error) {
     console.error("Illustration Composer failed:", error);
-    figma.notify("Illustration Composer failed");
-  } finally {
+    figma.notify("Illustration Composer initialization failed");
     figma.closePlugin();
   }
 }

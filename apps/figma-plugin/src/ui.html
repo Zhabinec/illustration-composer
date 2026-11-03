@@ -1,0 +1,140 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font: 13px Inter, sans-serif;
+      color: var(--figma-color-text, #222);
+      background: var(--figma-color-bg, #fff);
+    }
+
+    h2 {
+      margin: 0 0 20px;
+      font-size: 16px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 16px;
+      border: 1px solid var(--figma-color-border, #ddd);
+      border-radius: 6px;
+      background: var(--figma-color-bg, #fff);
+      color: inherit;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--figma-color-bg-brand, #0d99ff);
+      color: var(--figma-color-text-onbrand, white);
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    #status {
+      margin-top: 14px;
+      color: var(--figma-color-text-secondary, #777);
+    }
+  </style>
+</head>
+<body>
+  <h2>Illustration Composer</h2>
+
+  <label for="primary">Основной объект</label>
+  <select id="primary"></select>
+
+  <label for="secondary">Дополнительный объект</label>
+  <select id="secondary"></select>
+
+  <label for="layout">Тип композиции</label>
+  <select id="layout">
+    <option value="focus">Focus — с акцентом</option>
+    <option value="row">Row — в ряд</option>
+  </select>
+
+  <button id="create" disabled>Создать композицию</button>
+
+  <p id="status">Загрузка каталога...</p>
+
+  <script>
+    const primary = document.getElementById("primary");
+    const secondary = document.getElementById("secondary");
+    const layout = document.getElementById("layout");
+    const button = document.getElementById("create");
+    const status = document.getElementById("status");
+
+    function fillSelect(select, assets) {
+      select.replaceChildren();
+
+      for (const asset of assets) {
+        const option = document.createElement("option");
+
+        option.value = asset.id;
+        option.textContent = asset.name;
+
+        select.appendChild(option);
+      }
+    }
+
+    button.onclick = () => {
+      button.disabled = true;
+      status.textContent = "Создаём композицию...";
+
+      parent.postMessage({
+        pluginMessage: {
+          type: "create",
+          primaryId: primary.value,
+          secondaryId: secondary.value,
+          layout: layout.value
+        }
+      }, "*");
+    };
+
+    window.onmessage = event => {
+      const message = event.data.pluginMessage;
+
+      if (!message) return;
+
+      if (message.type === "ready") {
+        fillSelect(primary, message.assets);
+        fillSelect(secondary, message.assets);
+
+        primary.value = "wallet";
+        secondary.value = "coin";
+
+        if (!primary.value) primary.selectedIndex = 0;
+        if (!secondary.value) secondary.selectedIndex = 0;
+
+        button.disabled = !primary.value || !secondary.value;
+        status.textContent = `Доступно объектов: ${message.assets.length}`;
+      }
+
+      if (message.type === "created") {
+        button.disabled = false;
+        status.textContent = "Композиция создана";
+      }
+
+      if (message.type === "error") {
+        button.disabled = false;
+        status.textContent = message.message;
+      }
+    };
+  </script>
+</body>
+</html>
