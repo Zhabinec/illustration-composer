@@ -1,0 +1,21 @@
+{
+  "name": "@illustration-composer/figma-plugin",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild src/code.ts --bundle --platform=browser --target=es2020 --format=iife --outfile=dist/code.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.142.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
