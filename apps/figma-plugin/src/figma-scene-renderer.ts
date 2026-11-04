@@ -29,7 +29,8 @@ export class FigmaSceneRenderer {
       frame.y = 0;
 
       const ordered = [...scene.items].sort((a, b) =>
-        Number(a.variant.role === "main") - Number(b.variant.role === "main"));
+        Number(a.variant.role === "main") - Number(b.variant.role === "main") ||
+        (a.zIndex ?? 0) - (b.zIndex ?? 0));
       for (const item of ordered) {
         const copy = await this.adapter.cloneInto(item.variant.resourceKey, frame);
         copy.rescale(item.scale);

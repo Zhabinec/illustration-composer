@@ -3,7 +3,6 @@ import {
   LibraryRegistry,
   VariantId,
   createFocusComposition,
-  createAutomaticComposition,
   createRowComposition,
   findAssetVariant,
   palettePresets,
@@ -30,6 +29,7 @@ import type { RegistryDocument } from "./figma-registry-store.js";
 
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
+import { planAutomaticScene } from "./automatic-scene-planner.js";
 import { handleTemplateMessage } from "./template-messages.js";
 import { requestCompositionAdjustment } from "./composition-adjustments.js";
 import { postNamedCompositionResolution } from "./named-composition.js";
@@ -573,8 +573,10 @@ async function main(): Promise<void> {
         throw new Error("Укажи хотя бы один предмет.");
       }
 
-      const scene = layout === "automatic"
-        ? createAutomaticComposition(canvas.width, canvas.height, sources)
+      const automatic = layout === "automatic"
+        ? await planAutomaticScene(canvas.width, canvas.height, sources, paletteSourceNodeIds(state.palettes)) : null;
+      const scene = automatic
+        ? automatic.scene
         : layout === "row"
         ? createRowComposition(
             canvas.width,
@@ -605,7 +607,7 @@ async function main(): Promise<void> {
 
       const frame = await renderer.render(
         scene,
-        `${layout === "automatic" ? "Auto" : layout === "row" ? "Row" : "Focus"} - ${names.join(" + ")} - ${canvas.width}x${canvas.height}`,
+        `${automatic?.description ?? (layout === "row" ? "Row" : "Focus")} - ${names.join(" + ")} - ${canvas.width}x${canvas.height}`,
         palette
       );
 

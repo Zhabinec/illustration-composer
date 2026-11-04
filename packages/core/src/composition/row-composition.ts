@@ -18,6 +18,7 @@ export interface CompositionItem {
   y: number;
   scale: number;
   rotation: number;
+  zIndex?: number;
 }
 
 export interface CompositionScene {

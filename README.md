@@ -51,6 +51,7 @@ Core содержит предметы, варианты, правила выб�
 - [Регистрация и хранение](docs/registry-storage-check.md)
 - [Композиции по названиям](docs/named-compositions.md)
 - [Автоматическая расстановка, фон и план работы с референсами](docs/automatic-compositions.md)
+- [Первое отношение: предмет на книге](docs/surface-compositions.md)
 - [Метафоры и ограничения локального подбора](docs/metaphor-compositions.md)
 - [Шаблоны](docs/composition-templates.md)
 - [Все исходные примеры и правила авторских перекрытий](docs/reference-compositions.md)
