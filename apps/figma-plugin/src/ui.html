@@ -37,6 +37,7 @@
   <h2>Illustration Composer</h2>
   <div class="tabs">
     <button id="tab-compose" class="current">Композиция</button>
+    <button id="tab-templates">Шаблоны</button>
     <button id="tab-library">Библиотека</button>
   </div>
 
@@ -80,6 +81,28 @@
     <label for="palette-file">Своя палитра (JSON)</label>
     <input type="file" id="palette-file" accept=".json,application/json">
     <button id="create" class="primary" style="width:100%;margin-top:12px" disabled>Создать композицию</button>
+  </section>
+
+  <section id="templates" hidden>
+    <p class="muted">Повтори готовую композицию из примеров или сохрани свою сборку из исходных векторов. Слои, фоновые предметы и перекрытия сохранятся.</p>
+    <label for="template-name">Название нового шаблона</label>
+    <input id="template-name" maxlength="120" placeholder="Например: Телефон и пазлы — квадрат">
+    <button id="template-save" style="width:100%;margin-top:10px">Сохранить выделенный фрейм / группу</button>
+    <p class="muted">На странице «Примеры композиций» выдели целиком фрейм «Фон», затем сохрани его здесь. Шаблон ссылается на источник: изменения источника попадут в следующие копии.</p>
+    <label for="template-select">Сохранённые композиции</label>
+    <select id="template-select"></select>
+    <img id="template-image" class="preview" style="width:100%;height:180px" alt="Предпросмотр композиции" hidden>
+    <p id="template-size" class="muted"></p>
+    <h3>Предметы в расстановке</h3>
+    <p class="muted">Оставь исходные объекты или замени их предметами каталога. Новый предмет впишется в место исходного с сохранением пропорций. Линии и фон остаются.</p>
+    <div id="template-slots"></div>
+    <label for="template-scale">Масштаб шаблона, %</label>
+    <input id="template-scale" type="number" min="10" max="400" step="1" value="100" required>
+    <p class="muted" id="template-output-size"></p>
+    <p class="muted">100% — исходный размер. Холст и вся композиция масштабируются вместе: квадрат остаётся квадратом, пропорции оригинала сохраняются.</p>
+    <label for="template-palette">Палитра копии</label>
+    <select id="template-palette"></select>
+    <button id="template-create" class="primary" style="width:100%;margin-top:12px" disabled>Создать композицию</button>
   </section>
 
   <section id="library" hidden>
@@ -146,6 +169,13 @@
     <div class="panel" id="variant-list"></div>
   </section>
 
+  <div id="composition-adjustment" class="panel" hidden>
+    <strong>Второстепенным предметам не хватает места</strong>
+    <p class="muted">Сдвига недостаточно, чтобы сохранить главный предмет открытым. Можно уменьшить указанные предметы и разместить их без пересечения.</p>
+    <p id="composition-adjustment-details"></p>
+    <button id="composition-adjustment-accept" class="primary">Уменьшить и создать</button>
+    <button id="composition-adjustment-cancel">Вернуться к настройкам</button>
+  </div>
   <div id="status">Загрузка библиотеки…</div>
 
   <script>
@@ -179,6 +209,31 @@
     let detectedColors = [];
     let customPalette = null;
     let pendingConflict = null;
+    let templateSlots = [];
+    let templateDimensions = null;
+    let pendingAdjustment = null;
+
+    function cancelAdjustment() {
+      pendingAdjustment = null;
+      element("composition-adjustment").hidden = true;
+      ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+      element("template-create").disabled = !element("template-select").value;
+    }
+    document.addEventListener("input", () => { if (pendingAdjustment) cancelAdjustment(); });
+    document.addEventListener("change", () => { if (pendingAdjustment) cancelAdjustment(); });
+    element("composition-adjustment-cancel").onclick = () => {
+      cancelAdjustment();
+      ui.status.textContent = "Создание отменено. Можно изменить предметы или расстановку.";
+    };
+    element("composition-adjustment-accept").onclick = () => {
+      if (!pendingAdjustment) return;
+      const request = pendingAdjustment;
+      cancelAdjustment();
+      ui.create.disabled = true;
+      element("template-create").disabled = true;
+      ui.status.textContent = "Создаём композицию с согласованным уменьшением…";
+      send(request);
+    };
 
     function send(message) {
       parent.postMessage({ pluginMessage: message }, "*");
@@ -196,14 +251,91 @@
       if (previous && options.some(item => item.value === previous)) select.value = previous;
     }
 
-    function displayTab(library) {
-      ui.compose.hidden = library;
-      ui.library.hidden = !library;
-      element("tab-compose").classList.toggle("current", !library);
-      element("tab-library").classList.toggle("current", library);
+    function displayTab(name) {
+      if (pendingAdjustment) cancelAdjustment();
+      for (const tab of ["compose", "templates", "library"]) {
+        element(tab).hidden = tab !== name;
+        element(`tab-${tab}`).classList.toggle("current", tab === name);
+      }
+      if (name === "templates") send({ type: "template-list" });
     }
-    element("tab-compose").onclick = () => displayTab(false);
-    element("tab-library").onclick = () => displayTab(true);
+    element("tab-compose").onclick = () => displayTab("compose");
+    element("tab-library").onclick = () => displayTab("library");
+    element("tab-templates").onclick = () => displayTab("templates");
+
+    function previewTemplate() {
+      element("template-image").hidden = true;
+      element("template-slots").replaceChildren();
+      templateSlots = [];
+      templateDimensions = null;
+      element("template-output-size").textContent = "";
+      element("template-size").textContent = "";
+      element("template-create").disabled = true;
+      if (element("template-select").value) {
+        send({ type: "template-preview", id: element("template-select").value });
+      }
+    }
+    element("template-select").onchange = previewTemplate;
+    function renderTemplateSlots(slots) {
+      templateSlots = [];
+      element("template-slots").replaceChildren();
+      for (const slot of slots) {
+        const panel = document.createElement("div");
+        panel.className = "panel";
+        const label = document.createElement("label");
+        const select = document.createElement("select");
+        select.id = `slot-${slot.index}`;
+        label.htmlFor = select.id;
+        const role = slot.kind === "decoration" ? "Декор" : slot.kind === "primary" ? "Главный предмет" : "Второстепенный предмет";
+        label.textContent = `${role} (в оригинале — ${slot.name})`;
+        fillSelect(select, [
+          { value: "", label: "Оставить исходный объект" },
+          ...assets.map(asset => ({ value: asset.id, label: asset.name }))
+        ], false);
+        const variantLabel = document.createElement("label");
+        const variant = document.createElement("select");
+        variant.id = `slot-variant-${slot.index}`;
+        variantLabel.htmlFor = variant.id;
+        variantLabel.textContent = "Вариант нового предмета";
+        const update = () => {
+          const asset = assets.find(asset => asset.id === select.value);
+          const variants = asset ? asset.variants.filter(item => item.active) : [];
+          fillSelect(variant, variants.map(item => ({
+            value: item.id, label: `${item.size} · ${item.role === "main" ? "главный" : "фоновый"}`
+          })), false);
+          variant.hidden = !asset;
+          variantLabel.hidden = !asset;
+        };
+        select.onchange = update;
+        update();
+        panel.append(label, select, variantLabel, variant);
+        element("template-slots").appendChild(panel);
+        templateSlots.push({ id: slot.id, select, variant });
+      }
+    }
+    element("template-save").onclick = () => {
+      element("template-save").disabled = true;
+      ui.status.textContent = "Проверяем и сохраняем векторный источник…";
+      send({ type: "template-save", name: element("template-name").value });
+    };
+    function updateTemplateOutputSize() {
+      if (!templateDimensions) return;
+      const scale = Number(element("template-scale").value) / 100;
+      element("template-output-size").textContent = Number.isFinite(scale) && scale >= 0.1 && scale <= 4
+        ? `Размер результата: ${Math.round(templateDimensions.width * scale)} × ${Math.round(templateDimensions.height * scale)}`
+        : "Укажи масштаб от 10% до 400%";
+    }
+    element("template-scale").oninput = updateTemplateOutputSize;
+    element("template-create").onclick = () => {
+      if (!element("template-scale").reportValidity()) return;
+      element("template-create").disabled = true;
+      ui.status.textContent = "Создаём редактируемую копию…";
+      send({ type: "template-create", id: element("template-select").value,
+        scale: Number(element("template-scale").value) / 100, palette: element("template-palette").value,
+        replacements: templateSlots.filter(slot => slot.select.value).map(slot => ({
+          slotId: slot.id, assetId: slot.select.value, variantId: slot.variant.value
+        })) });
+    };
 
     function selectCandidate() {
       const candidate = candidates.find(item => item.nodeId === ui.candidate.value);
@@ -296,6 +428,7 @@
       if (!ui.secondary.value && assets.some(item => item.id === "coin")) ui.secondary.value = "coin";
       ui.create.disabled = !ui.primary.value || !ui.secondary.value;
       fillSelect(ui.palette, message.palettes.map(item => ({ value: item.id, label: item.name })));
+      fillSelect(element("template-palette"), message.palettes.map(item => ({ value: item.id, label: item.name })));
       if (customPalette && ![...ui.palette.options].some(item => item.value === "custom")) {
         const option = document.createElement("option");
         option.value = "custom";
@@ -393,6 +526,39 @@
       const message = event.data.pluginMessage;
       if (!message) return;
       switch (message.type) {
+        case "composition-adjustment-required":
+          pendingAdjustment = message.request;
+          element("composition-adjustment-details").textContent = message.suggestions
+            .map(item => `${item.name}: до ${item.percent}% текущего размера`).join("; ");
+          element("composition-adjustment").hidden = false;
+          ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+          element("template-create").disabled = !element("template-select").value;
+          ui.status.textContent = "Композиция ещё не создана. Подтверди уменьшение или измени настройки.";
+          element("composition-adjustment").scrollIntoView({ block: "nearest" });
+          break;
+        case "templates":
+          fillSelect(element("template-select"), message.templates.map(item => ({ value: item.id, label: item.name })));
+          if (message.selectedId) element("template-select").value = message.selectedId;
+          element("template-save").disabled = false;
+          if (message.saved) ui.status.textContent = "Шаблон сохранён в документе";
+          else if (!message.templates.length) ui.status.textContent = "Выдели готовую векторную композицию и сохрани первый шаблон";
+          previewTemplate();
+          break;
+        case "template-preview":
+          if (message.id !== element("template-select").value) break;
+          element("template-image").src = message.image;
+          element("template-image").hidden = false;
+          element("template-size").textContent = `${Math.round(message.width)} × ${Math.round(message.height)} · векторный источник`;
+          templateDimensions = { width: message.width, height: message.height };
+          updateTemplateOutputSize();
+          element("template-create").disabled = false;
+          renderTemplateSlots(message.slots);
+          break;
+        case "template-created":
+          element("template-create").disabled = false;
+          ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+          ui.status.textContent = "Композиция создана из независимых редактируемых векторов";
+          break;
         case "ready": updateReady(message); break;
         case "selected":
           ui.candidate.value = message.nodeId;
@@ -422,9 +588,12 @@
           break;
         case "created":
           ui.create.disabled = false;
+          element("template-create").disabled = !element("template-select").value;
           ui.status.textContent = "Композиция создана";
           break;
         case "error":
+          element("template-save").disabled = false;
+          element("template-create").disabled = !element("template-select").value;
           ui.create.disabled = !ui.primary.value || !ui.secondary.value;
           ui.status.textContent = message.message;
           break;

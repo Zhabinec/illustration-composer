@@ -17,7 +17,7 @@ export class FigmaAssetAdapter {
     return { width: source.width, height: source.height };
   }
 
-  async cloneInto(resourceKey: string, frame: FrameNode): Promise<GroupNode | FrameNode | VectorNode> {
+  async cloneInto(resourceKey: string, frame: FrameNode | GroupNode): Promise<GroupNode | FrameNode | VectorNode> {
     const source = await this.getSource(resourceKey);
     const copy = source.clone();
     frame.appendChild(copy);

@@ -27,6 +27,8 @@ import type { RegistryDocument } from "./figma-registry-store.js";
 
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
+import { handleTemplateMessage } from "./template-messages.js";
+import { requestCompositionAdjustment } from "./composition-adjustments.js";
 
 const formats = {
   landscape: { width: 1200, height: 800 },
@@ -577,6 +579,12 @@ async function main(): Promise<void> {
             secondary
           );
 
+      if (requestCompositionAdjustment(message,
+        (scene.shrinkSuggestions ?? []).map(item => ({
+          name: catalog.getById(item.assetId)?.name ?? item.assetId.value,
+          percent: Math.round(item.scale * 100)
+        })), JSON.stringify(scene))) return;
+
       const previewPage = figma.root.children.find(
         page => page.name === "Composer Preview"
       ) ?? figma.createPage();
@@ -618,6 +626,13 @@ async function main(): Promise<void> {
       try {
         const message =
           unknownMessage as Record<string, unknown>;
+
+        if (await handleTemplateMessage(message, {
+          palettes: state.palettes,
+          paletteSourceIds: state.palettes.map(item => item.sourceNodeId),
+          registry: state.registry,
+          sourceNodeIds: state.sourceNodeIds
+        })) return;
 
         switch (message.type) {
           case "refresh": {

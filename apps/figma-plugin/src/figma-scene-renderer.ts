@@ -19,12 +19,15 @@ export class FigmaSceneRenderer {
       frame.x = maxX + 100;
       frame.y = 0;
 
-      for (const item of scene.items) {
+      const ordered = [...scene.items].sort((a, b) =>
+        Number(a.variant.role === "main") - Number(b.variant.role === "main"));
+      for (const item of ordered) {
         const copy = await this.adapter.cloneInto(item.variant.resourceKey, frame);
         copy.rescale(item.scale);
         copy.rotation = item.rotation;
         copy.x = item.x;
         copy.y = item.y;
+        copy.setSharedPluginData("illustrationComposer", "composition-role", item.variant.role);
         this.paletteAdapter.apply(copy, palette);
       }
       return frame;
