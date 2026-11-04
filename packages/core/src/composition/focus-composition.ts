@@ -9,8 +9,10 @@ export function createFocusComposition(
   width: number,
   height: number,
   primary: CompositionSource,
-  secondary: CompositionSource
+  secondary?: CompositionSource,
+  ...additional: CompositionSource[]
 ): CompositionScene {
+  const sources = [primary, ...(secondary ? [secondary] : []), ...additional];
   if (
     !Number.isFinite(width) ||
     !Number.isFinite(height) ||
@@ -20,7 +22,7 @@ export function createFocusComposition(
     throw new Error("Invalid composition dimensions");
   }
 
-  for (const source of [primary, secondary]) {
+  for (const source of sources) {
     if (
       !Number.isFinite(source.width) ||
       !Number.isFinite(source.height) ||
@@ -36,60 +38,34 @@ export function createFocusComposition(
     height * 0.65 / primary.height
   );
 
-  const secondaryScale = Math.min(
-    width * 0.24 / secondary.width,
-    height * 0.28 / secondary.height
-  );
-
   const primaryWidth = primary.width * primaryScale;
   const primaryHeight = primary.height * primaryScale;
 
-  const secondaryWidth = secondary.width * secondaryScale;
-  const secondaryHeight = secondary.height * secondaryScale;
-
   const primaryX = Math.max(
     0,
-    (width - primaryWidth) / 2 - width * 0.06
+    (width - primaryWidth) / 2 - (sources.length > 1 ? width * 0.06 : 0)
   );
 
   const primaryY = Math.max(
     0,
-    (height - primaryHeight) / 2 - height * 0.05
+    (height - primaryHeight) / 2 - (sources.length > 1 ? height * 0.05 : 0)
   );
 
-  const secondaryX = Math.min(
-    width - secondaryWidth,
-    primaryX + primaryWidth * 0.74
-  );
-
-  const secondaryY = Math.min(
-    height - secondaryHeight,
-    primaryY + primaryHeight * 0.65
-  );
-
+  const anchors = [[0.74, 0.65], [-0.18, -0.12], [0.86, -0.14], [-0.2, 0.85], [1, 0.35], [0.4, 1], [-0.25, 0.3]];
   const scene: CompositionScene = {
     width,
     height,
-    items: [
-      {
-        assetId: primary.assetId,
-        variant: primary.variant,
-        x: primaryX,
-        y: primaryY,
-        scale: primaryScale,
-        rotation: 0
-      },
-      {
-        assetId: secondary.assetId,
-        variant: secondary.variant,
-        x: secondaryX,
-        y: secondaryY,
-        scale: secondaryScale,
-        rotation: 0
-      }
-    ]
+    items: sources.map((source, index) => {
+      if (index === 0) return { assetId: source.assetId, variant: source.variant,
+        x: primaryX, y: primaryY, scale: primaryScale, rotation: 0 };
+      const density = Math.sqrt(Math.max(1, (sources.length - 1) / 2));
+      const scale = Math.min(width * 0.24 / source.width, height * 0.28 / source.height) / density;
+      const [anchorX = 0.74, anchorY = 0.65] = anchors[(index - 1) % anchors.length]!;
+      return { assetId: source.assetId, variant: source.variant, scale, rotation: 0,
+        x: Math.max(0, Math.min(width - source.width * scale, primaryX + primaryWidth * anchorX)),
+        y: Math.max(0, Math.min(height - source.height * scale, primaryY + primaryHeight * anchorY)) };
+    })
   };
-  const sources = [primary, secondary];
   const boxes = spaceCompositionObjects(scene, scene.items.map((item, index) => ({
     id: String(index), name: item.assetId.value,
     x: item.x, y: item.y,

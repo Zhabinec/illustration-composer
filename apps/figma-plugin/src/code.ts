@@ -29,6 +29,8 @@ import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
 import { handleTemplateMessage } from "./template-messages.js";
 import { requestCompositionAdjustment } from "./composition-adjustments.js";
+import { postNamedCompositionResolution } from "./named-composition.js";
+import { postMetaphorComposition } from "./metaphor-composition.js";
 
 const formats = {
   landscape: { width: 1200, height: 800 },
@@ -470,7 +472,7 @@ async function main(): Promise<void> {
     ): Promise<void> {
       const format = stringField(message, "format");
 
-      if (!(format in formats)) {
+      if (!Object.prototype.hasOwnProperty.call(formats, format)) {
         throw new Error("Invalid canvas format");
       }
 
@@ -509,7 +511,14 @@ async function main(): Promise<void> {
         palette = resolvePalette(message.palette);
       }
 
-      const selection = [
+      const named = message.mode === "names" ? postNamedCompositionResolution(
+        typeof message.names === "string" ? message.names : "", catalog, size, secondaryRole
+      ) : null;
+      if (named?.errors.length) return;
+
+      const selection = named ? named.selection.map(item => ({
+        id: item.asset.id.value, role: item.variant.role, emphasis: item.emphasis
+      })) : [
         {
           id: stringField(message, "primaryId"),
           role: "main" as const,
@@ -562,8 +571,8 @@ async function main(): Promise<void> {
 
       const [primary, secondary] = sources;
 
-      if (!primary || !secondary) {
-        throw new Error("Two objects are required");
+      if (!primary) {
+        throw new Error("Укажи хотя бы один предмет.");
       }
 
       const scene = layout === "row"
@@ -576,7 +585,8 @@ async function main(): Promise<void> {
             canvas.width,
             canvas.height,
             primary,
-            secondary
+            secondary,
+            ...sources.slice(2)
           );
 
       if (requestCompositionAdjustment(message,
@@ -635,6 +645,20 @@ async function main(): Promise<void> {
         })) return;
 
         switch (message.type) {
+          case "resolve-metaphor": {
+            if (typeof message.requestId !== "number" || !Number.isSafeInteger(message.requestId)) {
+              throw new Error("Некорректный запрос подбора.");
+            }
+            const catalog = toAssetCatalog(new LibraryRegistry(state.registry));
+            postMetaphorComposition(typeof message.query === "string" ? message.query : "", catalog, message.requestId);
+            break;
+          }
+          case "resolve-names": {
+            const catalog = toAssetCatalog(new LibraryRegistry(state.registry));
+            postNamedCompositionResolution(typeof message.names === "string" ? message.names : "",
+              catalog, sizeField(message.size), roleField(message.secondaryRole));
+            break;
+          }
           case "refresh": {
             scanned = scanner.scan();
             sendReady();

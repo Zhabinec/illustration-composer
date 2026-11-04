@@ -63,4 +63,27 @@ describe("Focus composition", () => {
       width: 0
     })).toThrow();
   });
+
+  it.each([
+    [1200, 800], [1000, 1000], [800, 1200]
+  ])("supports one and multiple objects on %s × %s", (width, height) => {
+    for (const count of [1, 3, 5, 8]) {
+      const sources = Array.from({ length: count }, (_, index) => index === 0 ? book : pen);
+      const scene = createFocusComposition(width, height, sources[0]!, sources[1], ...sources.slice(2));
+      expect(scene.items).toHaveLength(count);
+      scene.items.forEach((item, index) => {
+        const source = sources[index]!;
+        expect(item.x).toBeGreaterThanOrEqual(0);
+        expect(item.y).toBeGreaterThanOrEqual(0);
+        expect(item.x + source.width * item.scale).toBeLessThanOrEqual(width + 0.001);
+        expect(item.y + source.height * item.scale).toBeLessThanOrEqual(height + 0.001);
+      });
+      for (let i = 0; i < count; i++) for (let j = i + 1; j < count; j++) {
+        const a = scene.items[i]!, b = scene.items[j]!;
+        const sa = sources[i]!, sb = sources[j]!;
+        expect(a.x < b.x + sb.width * b.scale && a.x + sa.width * a.scale > b.x &&
+          a.y < b.y + sb.height * b.scale && a.y + sa.height * a.scale > b.y).toBe(false);
+      }
+    }
+  });
 });

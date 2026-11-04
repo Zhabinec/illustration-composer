@@ -8,8 +8,9 @@
     h2 { font-size: 16px; margin: 0 0 14px; }
     h3 { font-size: 13px; margin: 18px 0 10px; }
     label { display: block; margin: 10px 0 5px; }
-    input, select, button { font: inherit; }
-    input:not([type="checkbox"]), select { width: 100%; padding: 8px; border: 1px solid var(--figma-color-border, #ccc); border-radius: 6px; background: var(--figma-color-bg, #fff); color: inherit; }
+    input, select, textarea, button { font: inherit; }
+    input:not([type="checkbox"]), select, textarea { width: 100%; padding: 8px; border: 1px solid var(--figma-color-border, #ccc); border-radius: 6px; background: var(--figma-color-bg, #fff); color: inherit; }
+    textarea { resize: vertical; }
     input[type="file"] { padding: 5px 0; }
     button { padding: 9px 12px; border: 1px solid var(--figma-color-border, #ccc); border-radius: 6px; background: var(--figma-color-bg-secondary, #f3f3f3); color: inherit; cursor: pointer; }
     button:disabled { opacity: .45; cursor: default; }
@@ -42,17 +43,39 @@
   </div>
 
   <section id="compose">
+    <label for="compose-mode">Выбор предметов</label>
+    <select id="compose-mode">
+      <option value="names">По названиям</option>
+      <option value="metaphor">По метафоре / заголовку</option>
+      <option value="manual">Из каталога — два предмета</option>
+    </select>
+    <div id="metaphor-selection" hidden>
+      <label for="metaphor-query">Метафора или заголовок</label>
+      <textarea id="metaphor-query" rows="2" maxlength="500" placeholder="Финансовая безопасность" aria-describedby="metaphor-help metaphor-feedback"></textarea>
+      <p id="metaphor-help" class="muted">Локальный подбор по темам библиотеки: финансы, безопасность, обучение, идеи, технологии, команда, работа, музыка. Состав можно изменить перед созданием.</p>
+      <button id="metaphor-pick" style="width:100%">Подобрать предметы</button>
+      <div id="metaphor-feedback" aria-live="polite"></div>
+    </div>
+    <div id="names-selection">
+      <label for="object-names">Названия предметов</label>
+      <textarea id="object-names" rows="3" maxlength="1000" placeholder="Монета, кошелёк, телефон" aria-describedby="names-help names-feedback"></textarea>
+      <p class="muted" id="names-help">От 1 до 8 предметов, через запятую, точку с запятой или с новой строки. Первый — главный. Для нескольких копий повтори название.</p>
+      <div id="names-feedback" aria-live="polite"></div>
+      <details><summary>Доступные названия</summary><p id="available-names" class="muted"></p></details>
+    </div>
+    <div id="manual-selection" hidden>
     <label for="primary">Основной объект</label>
     <select id="primary"></select>
     <label for="secondary">Дополнительный объект</label>
     <select id="secondary"></select>
+    </div>
     <div class="inline">
       <div>
         <label for="size">Детализация</label>
         <select id="size"><option value="L">L</option><option value="S">S</option></select>
       </div>
       <div>
-        <label for="secondary-role">Роль второго</label>
+        <label for="secondary-role" id="secondary-role-label">Роль дополнительных предметов</label>
         <select id="secondary-role">
           <option value="main">Главный</option>
           <option value="background">Фоновый</option>
@@ -212,11 +235,71 @@
     let templateSlots = [];
     let templateDimensions = null;
     let pendingAdjustment = null;
+    let namesValid = false;
+    let compositionBusy = false;
+    let namesTimer;
+    let metaphorRequestId = 0;
+    let metaphorBusy = false;
+
+    function invalidateMetaphor() {
+      metaphorRequestId++;
+      metaphorBusy = false;
+      element("metaphor-pick").disabled = false;
+      element("metaphor-feedback").textContent = "";
+    }
+    element("metaphor-query").oninput = invalidateMetaphor;
+    element("metaphor-pick").onclick = () => {
+      cancelAdjustment();
+      metaphorBusy = true;
+      namesValid = false;
+      updateCreateButton();
+      element("metaphor-pick").disabled = true;
+      element("metaphor-feedback").textContent = "Подбираем предметы…";
+      send({ type: "resolve-metaphor", query: element("metaphor-query").value, requestId: ++metaphorRequestId });
+    };
+
+    function updateCreateButton() {
+      const ready = element("compose-mode").value !== "manual"
+        ? namesValid : Boolean(ui.primary.value && ui.secondary.value);
+      ui.create.disabled = compositionBusy || metaphorBusy || !ready;
+    }
+
+    function requestNames() {
+      if (element("compose-mode").value === "manual") return;
+      namesValid = false;
+      updateCreateButton();
+      if (!element("object-names").value.trim()) {
+        element("names-feedback").textContent = "";
+        return;
+      }
+      element("names-feedback").textContent = "Проверяем названия…";
+      send({ type: "resolve-names", names: element("object-names").value,
+        size: ui.size.value, secondaryRole: ui.secondaryRole.value });
+    }
+    element("object-names").oninput = () => {
+      namesValid = false;
+      updateCreateButton();
+      clearTimeout(namesTimer);
+      namesTimer = setTimeout(requestNames, 250);
+    };
+    element("compose-mode").onchange = () => {
+      invalidateMetaphor();
+      const named = element("compose-mode").value !== "manual";
+      element("metaphor-selection").hidden = element("compose-mode").value !== "metaphor";
+      element("names-selection").hidden = !named;
+      element("manual-selection").hidden = named;
+      element("secondary-role-label").textContent = named ? "Роль дополнительных предметов" : "Роль второго";
+      updateCreateButton();
+      if (named) requestNames();
+    };
+    ui.size.onchange = requestNames;
+    ui.secondaryRole.onchange = requestNames;
 
     function cancelAdjustment() {
       pendingAdjustment = null;
       element("composition-adjustment").hidden = true;
-      ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+      compositionBusy = false;
+      updateCreateButton();
       element("template-create").disabled = !element("template-select").value;
     }
     document.addEventListener("input", () => { if (pendingAdjustment) cancelAdjustment(); });
@@ -230,6 +313,7 @@
       const request = pendingAdjustment;
       cancelAdjustment();
       ui.create.disabled = true;
+      compositionBusy = true;
       element("template-create").disabled = true;
       ui.status.textContent = "Создаём композицию с согласованным уменьшением…";
       send(request);
@@ -420,13 +504,14 @@
 
     function updateReady(message) {
       assets = message.assets;
+      element("available-names").textContent = assets.map(asset => asset.name).join(", ");
       candidates = message.candidates;
       fillSelect(ui.primary, assets.filter(asset => asset.variants.some(item => item.active && item.role === "main"))
         .map(asset => ({ value: asset.id, label: asset.name })));
       fillSelect(ui.secondary, assets.map(asset => ({ value: asset.id, label: asset.name })));
       if (!ui.primary.value && assets.some(item => item.id === "wallet")) ui.primary.value = "wallet";
       if (!ui.secondary.value && assets.some(item => item.id === "coin")) ui.secondary.value = "coin";
-      ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+      updateCreateButton();
       fillSelect(ui.palette, message.palettes.map(item => ({ value: item.id, label: item.name })));
       fillSelect(element("template-palette"), message.palettes.map(item => ({ value: item.id, label: item.name })));
       if (customPalette && ![...ui.palette.options].some(item => item.value === "custom")) {
@@ -444,7 +529,8 @@
       renderVariants();
       selectCandidate();
       ui.status.textContent = `Каталог: ${assets.length} объектов, ${message.palettes.length} палитр`;
-      ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+      updateCreateButton();
+      requestNames();
     }
 
     ui.paletteFile.onchange = async () => {
@@ -473,10 +559,12 @@
     };
 
     ui.create.onclick = () => {
+      compositionBusy = true;
       ui.create.disabled = true;
       ui.status.textContent = "Создаём композицию…";
       send({
         type: "create", primaryId: ui.primary.value, secondaryId: ui.secondary.value,
+        mode: element("compose-mode").value === "manual" ? "manual" : "names", names: element("object-names").value,
         size: ui.size.value, secondaryRole: ui.secondaryRole.value,
         layout: ui.layout.value, format: ui.format.value,
         palette: ui.palette.value === "custom" ? customPalette : ui.palette.value
@@ -526,12 +614,59 @@
       const message = event.data.pluginMessage;
       if (!message) return;
       switch (message.type) {
+        case "metaphor-resolved": {
+          if (message.requestId !== metaphorRequestId || message.query !== element("metaphor-query").value ||
+              element("compose-mode").value !== "metaphor") break;
+          metaphorBusy = false;
+          element("metaphor-pick").disabled = false;
+          const feedback = element("metaphor-feedback");
+          feedback.replaceChildren();
+          for (const text of message.errors.length ? message.errors : [
+            `Темы: ${message.themes.join(", ")}.`,
+            ...message.items.map((item, index) => `${index === 0 ? "Главный" : "Дополнительный"}: ${item.name}. ${item.reason}`),
+            "Состав ниже можно изменить. Порядок названий определяет главный предмет."
+          ]) {
+            const line = document.createElement("p");
+            line.textContent = text;
+            if (message.errors.length) line.style.color = "var(--figma-color-text-danger, #b42318)";
+            feedback.appendChild(line);
+          }
+          element("object-names").value = message.errors.length ? "" : message.items.map(item => item.name).join("\n");
+          requestNames();
+          if (message.errors.length) ui.status.textContent = "Подбор не выполнен. Уточни заголовок или укажи названия предметов.";
+          break;
+        }
+        case "names-resolved": {
+          if (message.query !== element("object-names").value || message.size !== ui.size.value ||
+              message.role !== ui.secondaryRole.value) break;
+          namesValid = !message.errors.length && message.items.length > 0;
+          if (!namesValid) compositionBusy = false;
+          const feedback = element("names-feedback");
+          feedback.replaceChildren();
+          if (message.items.length) {
+            const found = document.createElement("p");
+            found.textContent = message.items.map((item, index) => `${index + 1}. ${item.name} (${item.size}, ${item.role === "main" ? "главный" : "фоновый"})`).join("; ");
+            feedback.appendChild(found);
+          }
+          for (const text of [...message.errors, ...message.warnings]) {
+            const line = document.createElement("p");
+            line.textContent = text;
+            line.style.color = message.errors.includes(text) ? "var(--figma-color-text-danger, #b42318)" : "var(--figma-color-text-secondary, #666)";
+            feedback.appendChild(line);
+          }
+          updateCreateButton();
+          if (!compositionBusy) ui.status.textContent = namesValid
+            ? "Состав проверен. Можно создать композицию."
+            : "Исправь названия или варианты перед созданием композиции.";
+          break;
+        }
         case "composition-adjustment-required":
           pendingAdjustment = message.request;
           element("composition-adjustment-details").textContent = message.suggestions
             .map(item => `${item.name}: до ${item.percent}% текущего размера`).join("; ");
           element("composition-adjustment").hidden = false;
-          ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+          compositionBusy = false;
+          updateCreateButton();
           element("template-create").disabled = !element("template-select").value;
           ui.status.textContent = "Композиция ещё не создана. Подтверди уменьшение или измени настройки.";
           element("composition-adjustment").scrollIntoView({ block: "nearest" });
@@ -556,7 +691,8 @@
           break;
         case "template-created":
           element("template-create").disabled = false;
-          ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+          compositionBusy = false;
+          updateCreateButton();
           ui.status.textContent = "Композиция создана из независимых редактируемых векторов";
           break;
         case "ready": updateReady(message); break;
@@ -587,14 +723,20 @@
           ui.status.textContent = "Нужен выбор: сохранить альтернативу или заменить текущий вариант";
           break;
         case "created":
-          ui.create.disabled = false;
+          compositionBusy = false;
+          updateCreateButton();
           element("template-create").disabled = !element("template-select").value;
           ui.status.textContent = "Композиция создана";
           break;
         case "error":
+          if (metaphorBusy) {
+            invalidateMetaphor();
+            element("metaphor-feedback").textContent = message.message;
+          }
           element("template-save").disabled = false;
           element("template-create").disabled = !element("template-select").value;
-          ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+          compositionBusy = false;
+          updateCreateButton();
           ui.status.textContent = message.message;
           break;
       }

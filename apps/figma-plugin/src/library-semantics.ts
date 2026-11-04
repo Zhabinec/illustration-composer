@@ -1,0 +1,50 @@
+import type { SemanticConcept, SemanticAssetProfile } from "@illustration-composer/core";
+
+export const libraryConcepts: readonly SemanticConcept[] = [
+  { id: "finance", label: "Финансы", stems: ["финанс", "деньг", "денеж", "бюджет", "накоп", "сбереж", "оплат", "платеж", "покуп", "эконом", "инвест", "банк"] },
+  { id: "security", label: "Безопасность", stems: ["безопас", "защит", "надеж", "сохран", "приват", "конфиденц"] },
+  { id: "learning", label: "Обучение", stems: ["обуч", "учеб", "учебн", "образован", "знан", "изуч", "чтен", "читат", "развит", "навык", "курс"] },
+  { id: "ideas", label: "Идеи", stems: ["идея", "идеи", "идею", "вдохнов", "творч", "креатив", "озарен", "решен", "придум"] },
+  { id: "technology", label: "Технологии и связь", stems: ["технолог", "цифров", "мобиль", "онлайн", "связ", "общен", "коммуникац", "звон", "приложен", "интернет"] },
+  { id: "team", label: "Совместная работа", stems: ["команд", "вместе", "сотруднич", "партнер", "объедин", "взаимод", "совмест"] },
+  { id: "work", label: "Работа и порядок", stems: ["работ", "проект", "поряд", "документ", "организац", "планир", "задач", "продуктив"] },
+  { id: "music", label: "Музыка и звук", stems: ["музык", "звук", "аудио", "подкаст", "слуш", "мелод"] }
+];
+
+export const libraryProfiles: readonly SemanticAssetProfile[] = [
+  { assetId: "coin", associations: [
+    { conceptId: "finance", weight: 5, reason: "Монета обозначает деньги и накопления." },
+    { conceptId: "security", weight: 5, reason: "Замок на исходной монете передаёт защиту ценности." }
+  ] },
+  { assetId: "wallet", associations: [
+    { conceptId: "finance", weight: 4, reason: "Кошелёк поддерживает тему личных финансов." }
+  ] },
+  { assetId: "book", associations: [
+    { conceptId: "learning", weight: 5, reason: "Книга передаёт знания и обучение." }
+  ] },
+  { assetId: "pen", associations: [
+    { conceptId: "learning", weight: 3, reason: "Ручка поддерживает обучение и заметки." },
+    { conceptId: "ideas", weight: 3, reason: "Ручка передаёт запись и развитие идеи." },
+    { conceptId: "work", weight: 2, reason: "Ручка связывает сцену с планированием и записями." }
+  ] },
+  { assetId: "lamp", associations: [
+    { conceptId: "ideas", weight: 5, reason: "Лампа — метафора идеи и озарения." },
+    { conceptId: "learning", weight: 2, reason: "Лампа поддерживает образ места для учёбы." }
+  ] },
+  { assetId: "phone", associations: [
+    { conceptId: "technology", weight: 5, reason: "Телефон передаёт цифровую среду и связь." },
+    { conceptId: "music", weight: 2, reason: "Телефон поддерживает мобильное прослушивание." },
+    { conceptId: "team", weight: 2, reason: "Телефон поддерживает общение участников команды." }
+  ] },
+  { assetId: "puzzle", associations: [
+    { conceptId: "team", weight: 5, reason: "Пазлы передают соединение частей в общее целое." },
+    { conceptId: "ideas", weight: 2, reason: "Пазлы поддерживают поиск решения." }
+  ] },
+  { assetId: "folder", associations: [
+    { conceptId: "work", weight: 5, reason: "Папка передаёт порядок в документах и проектах." }
+  ] },
+  { assetId: "headphones", associations: [
+    { conceptId: "music", weight: 5, reason: "Наушники обозначают музыку и прослушивание аудио." },
+    { conceptId: "technology", weight: 2, reason: "Наушники поддерживают цифровое общение." }
+  ] }
+];
