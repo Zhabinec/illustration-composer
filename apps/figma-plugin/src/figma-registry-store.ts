@@ -13,7 +13,11 @@ import type {
 import type { ResolvedAsset } from "./figma-library-resolver.js";
 
 export interface RegisteredPalette extends ColorPalette {
-  sourceNodeId: string;
+  sourceNodeId?: string;
+}
+
+export function paletteSourceNodeIds(palettes: readonly RegisteredPalette[]): string[] {
+  return palettes.flatMap(palette => palette.sourceNodeId ? [palette.sourceNodeId] : []);
 }
 
 export interface RegistryDocument {
@@ -118,16 +122,18 @@ export class FigmaRegistryStore {
       }
     }
     const paletteIds = new Set<string>();
+    const assetIds = new Set(document.registry.assets.map(asset => asset.id));
     for (const palette of document.palettes) {
-      if (!palette || typeof palette.sourceNodeId !== "string" || !palette.sourceNodeId.trim() ||
+      if (!palette || (palette.sourceNodeId !== undefined &&
+          (typeof palette.sourceNodeId !== "string" || !palette.sourceNodeId.trim() || sources.has(palette.sourceNodeId))) ||
           typeof palette.id !== "string" || !palette.id.trim() || paletteIds.has(palette.id) ||
-          sources.has(palette.sourceNodeId) || typeof palette.colors !== "object" ||
+          assetIds.has(palette.id) || ["original", "mint", "peach"].includes(palette.id) || typeof palette.colors !== "object" ||
           palette.colors === null || Array.isArray(palette.colors)) {
         throw new Error("Invalid saved palette");
       }
       resolvePalette({ ...palette.colors, name: palette.name });
       paletteIds.add(palette.id);
-      sources.add(palette.sourceNodeId);
+      if (palette.sourceNodeId) sources.add(palette.sourceNodeId);
     }
     return document;
   }

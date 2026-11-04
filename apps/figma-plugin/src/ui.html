@@ -18,7 +18,7 @@
     button.danger { color: var(--figma-color-text-danger, #b42318); }
     .tabs, .inline { display: flex; gap: 8px; }
     .tabs { margin-bottom: 12px; }
-    .tabs button { flex: 1; }
+    .tabs button { flex: 1; padding: 9px 6px; }
     .tabs button.current { border-color: var(--figma-color-border-brand-strong, #0d99ff); }
     .inline > * { flex: 1; min-width: 0; }
     .muted { color: var(--figma-color-text-secondary, #777); font-size: 12px; }
@@ -40,6 +40,7 @@
     <button id="tab-compose" class="current">Композиция</button>
     <button id="tab-templates">Шаблоны</button>
     <button id="tab-library">Библиотека</button>
+    <button id="tab-palettes">Палитры</button>
   </div>
 
   <section id="compose">
@@ -101,8 +102,7 @@
     </div>
     <label for="palette">Палитра</label>
     <select id="palette"></select>
-    <label for="palette-file">Своя палитра (JSON)</label>
-    <input type="file" id="palette-file" accept=".json,application/json">
+    <p class="muted">Свои цветовые схемы можно добавить в разделе «Палитры».</p>
     <button id="create" class="primary" style="width:100%;margin-top:12px" disabled>Создать композицию</button>
   </section>
 
@@ -192,6 +192,29 @@
     <div class="panel" id="variant-list"></div>
   </section>
 
+  <section id="palettes" hidden>
+    <p class="muted">Палитры хранятся в этом Figma-файле и доступны после перезапуска. Это цветовые схемы, а не предметы композиции.</p>
+    <label for="palette-file">Добавить палитру из JSON</label>
+    <input type="file" id="palette-file" accept=".json,application/json">
+    <details>
+      <summary>Вставить JSON вручную</summary>
+      <label for="palette-json">JSON палитры</label>
+      <textarea id="palette-json" rows="6" maxlength="16384" placeholder='{"name":"Моя палитра","dark":"#334455","medium":"#8899AA","light":"#DDEEFF"}'></textarea>
+      <button id="palette-import" style="width:100%;margin-top:8px">Сохранить палитру в файле</button>
+    </details>
+    <p class="muted">Нужны name, dark, medium и light в формате #RRGGBB. Также можно задать pale, pink, pinkLight, yellow. Поддерживается вложенный объект colors. При совпадении названия ничего не перезаписывается.</p>
+    <div id="palette-feedback" aria-live="polite"></div>
+    <h3>Доступные палитры</h3>
+    <div id="palette-list"></div>
+  </section>
+
+  <div id="svg-export" class="panel">
+    <strong>Экспорт SVG</strong>
+    <p class="muted">После создания композиция выделяется автоматически. Для другого результата выдели его фрейм или группу целиком.</p>
+    <button id="export-svg" style="width:100%">Скачать выделенную композицию</button>
+    <p id="export-feedback" aria-live="polite" class="muted"></p>
+  </div>
+
   <div id="composition-adjustment" class="panel" hidden>
     <strong>Второстепенным предметам не хватает места</strong>
     <p class="muted">Сдвига недостаточно, чтобы сохранить главный предмет открытым. Можно уменьшить указанные предметы и разместить их без пересечения.</p>
@@ -230,7 +253,7 @@
     let assets = [];
     let candidates = [];
     let detectedColors = [];
-    let customPalette = null;
+    let paletteImportBusy = false;
     let pendingConflict = null;
     let templateSlots = [];
     let templateDimensions = null;
@@ -337,15 +360,17 @@
 
     function displayTab(name) {
       if (pendingAdjustment) cancelAdjustment();
-      for (const tab of ["compose", "templates", "library"]) {
+      for (const tab of ["compose", "templates", "library", "palettes"]) {
         element(tab).hidden = tab !== name;
         element(`tab-${tab}`).classList.toggle("current", tab === name);
       }
+      element("svg-export").hidden = name !== "compose" && name !== "templates";
       if (name === "templates") send({ type: "template-list" });
     }
     element("tab-compose").onclick = () => displayTab("compose");
     element("tab-library").onclick = () => displayTab("library");
     element("tab-templates").onclick = () => displayTab("templates");
+    element("tab-palettes").onclick = () => displayTab("palettes");
 
     function previewTemplate() {
       element("template-image").hidden = true;
@@ -514,11 +539,11 @@
       updateCreateButton();
       fillSelect(ui.palette, message.palettes.map(item => ({ value: item.id, label: item.name })));
       fillSelect(element("template-palette"), message.palettes.map(item => ({ value: item.id, label: item.name })));
-      if (customPalette && ![...ui.palette.options].some(item => item.value === "custom")) {
-        const option = document.createElement("option");
-        option.value = "custom";
-        option.textContent = customPalette.name;
-        ui.palette.appendChild(option);
+      element("palette-list").replaceChildren();
+      for (const palette of message.palettes) {
+        const row = document.createElement("p");
+        row.textContent = palette.name;
+        element("palette-list").appendChild(row);
       }
       fillSelect(ui.existingAsset, assets.map(asset => ({ value: asset.id, label: asset.name })));
       fillSelect(ui.manageAsset, assets.map(asset => ({ value: asset.id, label: asset.name })));
@@ -533,29 +558,37 @@
       requestNames();
     }
 
+    function importPalette(raw) {
+      if (paletteImportBusy) return;
+      try {
+        if (new TextEncoder().encode(raw).length > 16384) throw new Error("Слишком большой файл палитры (максимум 16 КБ)");
+        const palette = JSON.parse(raw);
+        paletteImportBusy = true;
+        element("palette-import").disabled = true;
+        ui.paletteFile.disabled = true;
+        element("palette-feedback").textContent = "Сохраняем палитру…";
+        send({ type: "import-palette", palette });
+      } catch (error) {
+        element("palette-feedback").textContent = error.message;
+      }
+    }
     ui.paletteFile.onchange = async () => {
       const file = ui.paletteFile.files[0];
       if (!file) return;
       try {
         if (file.size > 16384) throw new Error("Слишком большой файл палитры");
-        const data = JSON.parse(await file.text());
-        if (!data || typeof data !== "object" || typeof data.name !== "string") {
-          throw new Error("Неверный формат палитры");
-        }
-        customPalette = data;
-        const exists = [...ui.palette.options].some(item => item.value === "custom");
-        if (!exists) {
-          const option = document.createElement("option");
-          option.value = "custom";
-          ui.palette.appendChild(option);
-        }
-        ui.palette.querySelector('option[value="custom"]').textContent = data.name;
-        ui.palette.value = "custom";
-        ui.status.textContent = "Пользовательская палитра загружена";
+        importPalette(await file.text());
       } catch (error) {
-        customPalette = null;
-        ui.status.textContent = error.message;
+        element("palette-feedback").textContent = error.message;
+      } finally {
+        ui.paletteFile.value = "";
       }
+    };
+    element("palette-import").onclick = () => importPalette(element("palette-json").value);
+    element("export-svg").onclick = () => {
+      element("export-svg").disabled = true;
+      element("export-feedback").textContent = "Экспортируем SVG и проверяем повторным импортом в Figma…";
+      send({ type: "export-svg" });
     };
 
     ui.create.onclick = () => {
@@ -567,7 +600,7 @@
         mode: element("compose-mode").value === "manual" ? "manual" : "names", names: element("object-names").value,
         size: ui.size.value, secondaryRole: ui.secondaryRole.value,
         layout: ui.layout.value, format: ui.format.value,
-        palette: ui.palette.value === "custom" ? customPalette : ui.palette.value
+        palette: ui.palette.value
       });
     };
 
@@ -614,6 +647,28 @@
       const message = event.data.pluginMessage;
       if (!message) return;
       switch (message.type) {
+        case "palette-imported":
+          paletteImportBusy = false;
+          ui.paletteFile.disabled = false;
+          element("palette-import").disabled = false;
+          ui.palette.value = message.id;
+          element("template-palette").value = message.id;
+          element("palette-feedback").textContent = `«${message.name}» сохранена в Figma-файле и выбрана для следующих композиций.`;
+          break;
+        case "svg-exported": {
+          const blob = new Blob([message.svg], { type: "image/svg+xml;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = message.filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+          element("export-svg").disabled = false;
+          element("export-feedback").textContent = `SVG ${message.width} × ${message.height} передан на скачивание. Повторный импорт проверен: ${message.vectorCount} векторных элементов.`;
+          break;
+        }
         case "metaphor-resolved": {
           if (message.requestId !== metaphorRequestId || message.query !== element("metaphor-query").value ||
               element("compose-mode").value !== "metaphor") break;
@@ -729,6 +784,16 @@
           ui.status.textContent = "Композиция создана";
           break;
         case "error":
+          if (message.operation === "import-palette") {
+            paletteImportBusy = false;
+            ui.paletteFile.disabled = false;
+            element("palette-import").disabled = false;
+            element("palette-feedback").textContent = message.message;
+          }
+          if (message.operation === "export-svg") {
+            element("export-svg").disabled = false;
+            element("export-feedback").textContent = message.message;
+          }
           if (metaphorBusy) {
             invalidateMetaphor();
             element("metaphor-feedback").textContent = message.message;

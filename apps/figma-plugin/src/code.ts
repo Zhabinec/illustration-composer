@@ -19,6 +19,7 @@ import { suggestAssetNames } from "./figma-asset-matcher.js";
 import { resolveLibrary } from "./figma-library-resolver.js";
 import {
   FigmaRegistryStore,
+  paletteSourceNodeIds,
   sourceIdentity,
   toAssetCatalog
 } from "./figma-registry-store.js";
@@ -31,6 +32,8 @@ import { handleTemplateMessage } from "./template-messages.js";
 import { requestCompositionAdjustment } from "./composition-adjustments.js";
 import { postNamedCompositionResolution } from "./named-composition.js";
 import { postMetaphorComposition } from "./metaphor-composition.js";
+import { preparePaletteImport } from "./palette-import.js";
+import { exportSelectedComposition } from "./figma-svg-export.js";
 
 const formats = {
   landscape: { width: 1200, height: 800 },
@@ -223,9 +226,7 @@ async function main(): Promise<void> {
     function knownNodes(): Set<string> {
       return new Set([
         ...Object.values(state.sourceNodeIds),
-        ...state.palettes.map(
-          palette => palette.sourceNodeId
-        )
+        ...paletteSourceNodeIds(state.palettes)
       ]);
     }
 
@@ -279,10 +280,7 @@ async function main(): Promise<void> {
           { id: "original", name: "Фиолетовая" },
           { id: "mint", name: "Мятная" },
           { id: "peach", name: "Персиковая" },
-          ...state.palettes.map(item => ({
-            id: item.id,
-            name: item.name
-          }))
+          ...state.palettes.map(item => ({ id: item.id, name: item.name, colors: item.colors }))
         ]
       });
     }
@@ -639,12 +637,24 @@ async function main(): Promise<void> {
 
         if (await handleTemplateMessage(message, {
           palettes: state.palettes,
-          paletteSourceIds: state.palettes.map(item => item.sourceNodeId),
+          paletteSourceIds: paletteSourceNodeIds(state.palettes),
           registry: state.registry,
           sourceNodeIds: state.sourceNodeIds
         })) return;
 
         switch (message.type) {
+          case "import-palette": {
+            const palette = preparePaletteImport(message.palette, state.palettes, state.registry.assets.map(asset => asset.id));
+            save(new LibraryRegistry(state.registry), { ...state, palettes: [...state.palettes, palette] });
+            sendReady();
+            figma.ui.postMessage({ type: "palette-imported", id: palette.id, name: palette.name });
+            break;
+          }
+          case "export-svg": {
+            const result = await exportSelectedComposition(paletteSourceNodeIds(state.palettes));
+            figma.ui.postMessage({ type: "svg-exported", ...result });
+            break;
+          }
           case "resolve-metaphor": {
             if (typeof message.requestId !== "number" || !Number.isSafeInteger(message.requestId)) {
               throw new Error("Некорректный запрос подбора.");
@@ -827,6 +837,8 @@ async function main(): Promise<void> {
 
         figma.ui.postMessage({
           type: "error",
+          operation: typeof unknownMessage === "object" && unknownMessage !== null && "type" in unknownMessage
+            ? unknownMessage.type : undefined,
           message: error instanceof Error
             ? error.message
             : String(error)

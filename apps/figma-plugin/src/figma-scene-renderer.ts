@@ -30,6 +30,7 @@ export class FigmaSceneRenderer {
         copy.setSharedPluginData("illustrationComposer", "composition-role", item.variant.role);
         this.paletteAdapter.apply(copy, palette);
       }
+      figma.currentPage.selection = [frame];
       return frame;
     } catch (error) {
       frame.remove();

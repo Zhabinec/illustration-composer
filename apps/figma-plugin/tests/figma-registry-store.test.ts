@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AssetId, LibraryRegistry, VariantId, palettePresets } from "@illustration-composer/core";
 import { FigmaRegistryStore, toAssetCatalog } from "../src/figma-registry-store.js";
 import type { RegistryDocument } from "../src/figma-registry-store.js";
+import { paletteSourceNodeIds } from "../src/figma-registry-store.js";
+import { preparePaletteImport } from "../src/palette-import.js";
 
 const namespace = "illustrationComposer";
 const key = "illustration-composer-registry-v1";
@@ -43,6 +45,27 @@ function environment(shared = "", legacy = "", pluginId?: string) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Figma registry document storage", () => {
+  it("persists JSON palettes without Figma source nodes alongside old palettes and history", () => {
+    environment();
+    const document = savedDocument();
+    const palette = preparePaletteImport({ name: "Новая", dark: "#112233", medium: "#445566", light: "#AABBCC" }, document.palettes, []);
+    document.palettes.push(palette);
+    new FigmaRegistryStore().save(document);
+    const loaded = new FigmaRegistryStore().load()!;
+    expect(loaded).toEqual(document);
+    expect(paletteSourceNodeIds(loaded.palettes)).toEqual(["1:3"]);
+    expect(toAssetCatalog(new LibraryRegistry(loaded.registry)).getAll().map(asset => asset.id.value)).toEqual(["bush"]);
+  });
+
+  it("does not accept palette IDs colliding with assets or presets", () => {
+    const { root } = environment();
+    for (const id of ["bush", "mint"]) {
+      const document = savedDocument();
+      document.palettes.push({ ...palettePresets.peach!, id });
+      expect(() => new FigmaRegistryStore().save(document)).toThrow("Invalid saved palette");
+    }
+    expect(root.setSharedPluginData).not.toHaveBeenCalled();
+  });
   it("starts without an ID without accessing private data", () => {
     const { root } = environment();
     expect(new FigmaRegistryStore().load()).toBeNull();
