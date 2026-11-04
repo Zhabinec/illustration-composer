@@ -5,6 +5,7 @@ import {
   createFocusComposition,
   createRowComposition,
   findAssetVariant,
+  palettePresets,
   resolvePalette
 } from "@illustration-composer/core";
 
@@ -277,9 +278,7 @@ async function main(): Promise<void> {
         assets: registry.getAll(),
         candidates: candidates(),
         palettes: [
-          { id: "original", name: "Фиолетовая" },
-          { id: "mint", name: "Мятная" },
-          { id: "peach", name: "Персиковая" },
+          ...Object.values(palettePresets).map(item => ({ id: item.id, name: item.name, colors: item.colors })),
           ...state.palettes.map(item => ({ id: item.id, name: item.name, colors: item.colors }))
         ]
       });
@@ -615,8 +614,8 @@ async function main(): Promise<void> {
     }
 
     figma.showUI(__html__, {
-      width: 420,
-      height: 620,
+      width: 520,
+      height: 740,
       themeColors: true
     });
 
@@ -643,6 +642,14 @@ async function main(): Promise<void> {
         })) return;
 
         switch (message.type) {
+          case "resize-ui": {
+            if (typeof message.width === "number" && typeof message.height === "number" &&
+                Number.isFinite(message.width) && Number.isFinite(message.height)) {
+              figma.ui.resize(Math.round(Math.max(440, Math.min(1000, message.width))),
+                Math.round(Math.max(560, Math.min(1000, message.height))));
+            }
+            break;
+          }
           case "import-palette": {
             const palette = preparePaletteImport(message.palette, state.palettes, state.registry.assets.map(asset => asset.id));
             save(new LibraryRegistry(state.registry), { ...state, palettes: [...state.palettes, palette] });

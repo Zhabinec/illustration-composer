@@ -3,31 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <style>
+    :root { --composer-action: #1261cc; --composer-action-hover: #0d51b1; --composer-on-action: #fff; }
     * { box-sizing: border-box; }
-    body { margin: 0; padding: 16px; font: 13px Inter, sans-serif; color: var(--figma-color-text, #222); background: var(--figma-color-bg, #fff); }
-    h2 { font-size: 16px; margin: 0 0 14px; }
+    body { margin: 0; font: 13px/1.45 Inter, -apple-system, sans-serif; color: var(--figma-color-text, #222); background: var(--figma-color-bg, #fff); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    h2 { font-size: 15px; margin: 0; letter-spacing: -.3px; }
     h3 { font-size: 13px; margin: 18px 0 10px; }
-    label { display: block; margin: 10px 0 5px; }
+    label { display: block; margin: 12px 0 6px; font-weight: 500; }
     input, select, textarea, button { font: inherit; }
-    input:not([type="checkbox"]), select, textarea { width: 100%; padding: 8px; border: 1px solid var(--figma-color-border, #ccc); border-radius: 6px; background: var(--figma-color-bg, #fff); color: inherit; }
+    input:not([type="checkbox"]), select, textarea { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--figma-color-border, #d9d9df); border-radius: 8px; background: var(--figma-color-bg, #fff); color: inherit; }
     textarea { resize: vertical; }
     input[type="file"] { padding: 5px 0; }
-    button { padding: 9px 12px; border: 1px solid var(--figma-color-border, #ccc); border-radius: 6px; background: var(--figma-color-bg-secondary, #f3f3f3); color: inherit; cursor: pointer; }
+    button { min-height: 36px; padding: 8px 12px; font-weight: 500; border: 1px solid var(--figma-color-border, #d9d9df); border-radius: 8px; background: var(--figma-color-bg, #fff); color: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+    button:hover:not(:disabled) { background: var(--figma-color-bg-hover, #f3f3f6); border-color: var(--figma-color-border-strong, #bcbcc7); }
+    :focus-visible { outline: 2px solid var(--figma-color-border-brand-strong, #0d99ff); outline-offset: 2px; }
     button:disabled { opacity: .45; cursor: default; }
-    button.primary { color: var(--figma-color-text-onbrand, white); background: var(--figma-color-bg-brand, #0d99ff); border-color: transparent; }
+    button.primary { color: var(--composer-on-action); background: var(--composer-action); border-color: transparent; }
+    button.primary:hover:not(:disabled) { background: var(--composer-action-hover); }
     button.danger { color: var(--figma-color-text-danger, #b42318); }
     .tabs, .inline { display: flex; gap: 8px; }
-    .tabs { margin-bottom: 12px; }
-    .tabs button { flex: 1; padding: 9px 6px; }
-    .tabs button.current { border-color: var(--figma-color-border-brand-strong, #0d99ff); }
+    .app-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--figma-color-border, #e6e6eb); flex: none; }
+    .brand { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .brand span { font-size: 11px; color: var(--figma-color-text-secondary, #666); }
+    .tabs { padding: 3px; border-radius: 10px; gap: 3px; background: var(--figma-color-bg-secondary, #f3f3f6); }
+    .tabs button { flex: 1; min-width: 0; padding: 7px 5px; border-color: transparent; background: transparent; color: var(--figma-color-text-secondary, #666); }
+    .tabs button.current { background: var(--figma-color-bg, #fff); color: var(--figma-color-text, #222); box-shadow: 0 1px 3px #00000012; }
+    .section-intro { padding: 16px 20px 8px; flex: none; }
+    .section-intro h1 { font-size: 18px; letter-spacing: -.4px; margin: 0 0 4px; }
+    .section-intro p { margin: 0; color: var(--figma-color-text-secondary, #666); font-size: 12px; }
+    #workspace { flex: 1; min-height: 0; overflow: auto; padding: 0 20px 18px; scrollbar-gutter: stable; }
+    section > :first-child { margin-top: 8px; }
+    details { margin: 12px 0; }
+    summary { cursor: pointer; color: var(--figma-color-text-secondary, #666); font-size: 12px; padding: 5px 0; }
+    details[open] > summary { color: var(--figma-color-text, #222); }
     .inline > * { flex: 1; min-width: 0; }
     .muted { color: var(--figma-color-text-secondary, #777); font-size: 12px; }
-    .panel { border: 1px solid var(--figma-color-border, #ddd); border-radius: 8px; padding: 12px; margin: 12px 0; }
+    .panel { border: 1px solid var(--figma-color-border, #ddd); border-radius: 10px; padding: 12px; margin: 10px 0; }
+    .slot-row { padding: 10px 0; border-bottom: 1px solid var(--figma-color-border, #e6e6eb); }
+    .slot-row:last-child { border-bottom: 0; }
+    .slot-row > label:first-child { margin-top: 0; }
+    .slot-role { float: right; font-weight: 400; font-size: 11px; color: var(--figma-color-text-secondary, #666); }
+    .slot-variant { margin-top: 8px; }
+    .slot-variant select { min-height: 34px; font-size: 12px; }
+    .template-workbench { display: grid; grid-template-columns: minmax(140px, .85fr) minmax(190px, 1.25fr); gap: 18px; align-items: start; margin-top: 16px; }
+    .template-preview-area { position: sticky; top: 4px; min-width: 0; }
+    .template-edit-area { min-width: 0; }
+    .template-edit-area h3 { margin-top: 0; }
+    #template-image { border: 1px solid var(--figma-color-border, #e6e6eb); padding: 6px; border-radius: 12px; height: 195px !important; margin: 0 auto; }
+    #template-size, #template-output-size { font-size: 11px; margin: 6px 0; }
+    #template-catalog-status { font-size: 11px; float: right; padding-top: 12px; }
+    #palette-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .palette-card { display: flex; flex-direction: column; gap: 10px; align-items: stretch; text-align: left; padding: 12px; }
+    .palette-card[aria-pressed="true"] { border-color: var(--figma-color-border-brand-strong, #0d99ff); background: var(--figma-color-bg-selected, #e5f4ff); }
+    .palette-swatches { display: flex; gap: 4px; }
+    .palette-swatches span { height: 24px; flex: 1; border-radius: 5px; border: 1px solid #00000014; }
     .preview { display: block; width: 140px; height: 116px; object-fit: contain; margin: 9px auto; background: var(--figma-color-bg-secondary, #fafafa); border-radius: 6px; }
     .compare { display: flex; gap: 10px; }
     .compare > div { flex: 1; text-align: center; min-width: 0; }
     .compare img { width: 100%; height: 112px; object-fit: contain; background: var(--figma-color-bg-secondary, #fafafa); }
-    #status { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--figma-color-border, #ddd); color: var(--figma-color-text-secondary, #666); }
+    .action-bar { flex: none; border-top: 1px solid var(--figma-color-border, #ddd); padding: 12px 20px 10px; background: var(--figma-color-bg, #fff); }
+    .action-buttons { display: flex; gap: 8px; }
+    .action-buttons > .primary { flex: 1; min-height: 42px; }
+    #svg-export button { min-height: 42px; }
+    #export-feedback { font-size: 11px; margin: 8px 0 0; }
+    #export-feedback:empty { display: none; }
+    #status { flex: none; padding: 7px 20px 9px; color: var(--figma-color-text-secondary, #666); font-size: 11px; max-height: 55px; overflow: auto; }
+    #resize-window { position: fixed; right: 2px; bottom: 2px; width: 14px; height: 14px; min-height: 14px; padding: 0; border: 0; border-radius: 0; cursor: nwse-resize; background: radial-gradient(circle, currentColor 1px, transparent 1px) bottom right / 4px 4px; opacity: .35; touch-action: none; }
+    @media (prefers-reduced-motion: reduce) { button { transition: none; } }
     .variant { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--figma-color-border, #ddd); }
     .variant button { font-size: 11px; padding: 6px; }
     .swatch-option { display: flex; gap: 8px; }
@@ -35,13 +76,17 @@
   </style>
 </head>
 <body>
-  <h2>Illustration Composer</h2>
+  <header class="app-header">
+  <div class="brand"><h2>Illustration Composer</h2><span>Студия иллюстраций</span></div>
   <div class="tabs">
     <button id="tab-compose" class="current">Композиция</button>
     <button id="tab-templates">Шаблоны</button>
     <button id="tab-library">Библиотека</button>
     <button id="tab-palettes">Палитры</button>
   </div>
+  </header>
+  <div class="section-intro"><h1 id="section-title">Новая композиция</h1><p id="section-help">Подберите предметы по названиям или теме.</p></div>
+  <main id="workspace">
 
   <section id="compose">
     <label for="compose-mode">Выбор предметов</label>
@@ -53,14 +98,15 @@
     <div id="metaphor-selection" hidden>
       <label for="metaphor-query">Метафора или заголовок</label>
       <textarea id="metaphor-query" rows="2" maxlength="500" placeholder="Финансовая безопасность" aria-describedby="metaphor-help metaphor-feedback"></textarea>
-      <p id="metaphor-help" class="muted">Локальный подбор по темам библиотеки: финансы, безопасность, обучение, идеи, технологии, команда, работа, музыка. Состав можно изменить перед созданием.</p>
+      <p id="metaphor-help" class="muted">Предложим предметы из библиотеки. Состав можно изменить.</p>
+      <details><summary>Какие темы доступны</summary><p class="muted">Подбор понимает финансы, безопасность, обучение, идеи, технологии, команду, работу и музыку. Произвольные темы пока не поддерживаются.</p></details>
       <button id="metaphor-pick" style="width:100%">Подобрать предметы</button>
       <div id="metaphor-feedback" aria-live="polite"></div>
     </div>
     <div id="names-selection">
       <label for="object-names">Названия предметов</label>
       <textarea id="object-names" rows="3" maxlength="1000" placeholder="Монета, кошелёк, телефон" aria-describedby="names-help names-feedback"></textarea>
-      <p class="muted" id="names-help">От 1 до 8 предметов, через запятую, точку с запятой или с новой строки. Первый — главный. Для нескольких копий повтори название.</p>
+      <p class="muted" id="names-help">До 8 предметов через запятую. Первый — главный.</p>
       <div id="names-feedback" aria-live="polite"></div>
       <details><summary>Доступные названия</summary><p id="available-names" class="muted"></p></details>
     </div>
@@ -72,23 +118,23 @@
     </div>
     <div class="inline">
       <div>
-        <label for="size">Детализация</label>
-        <select id="size"><option value="L">L</option><option value="S">S</option></select>
+        <label for="size">Рисунок</label>
+        <select id="size"><option value="L">Подробный</option><option value="S">Упрощённый</option></select>
       </div>
       <div>
-        <label for="secondary-role" id="secondary-role-label">Роль дополнительных предметов</label>
+        <label for="secondary-role" id="secondary-role-label">Дополнительные предметы</label>
         <select id="secondary-role">
-          <option value="main">Главный</option>
-          <option value="background">Фоновый</option>
+          <option value="main">С акцентом</option>
+          <option value="background">На фоне</option>
         </select>
       </div>
     </div>
     <div class="inline">
       <div>
-        <label for="layout">Композиция</label>
+        <label for="layout">Расстановка</label>
         <select id="layout">
-          <option value="focus">Focus — акцент</option>
-          <option value="row">Row — в ряд</option>
+          <option value="focus">Акцент на главном</option>
+          <option value="row">В ряд</option>
         </select>
       </div>
       <div>
@@ -102,35 +148,38 @@
     </div>
     <label for="palette">Палитра</label>
     <select id="palette"></select>
-    <p class="muted">Свои цветовые схемы можно добавить в разделе «Палитры».</p>
-    <button id="create" class="primary" style="width:100%;margin-top:12px" disabled>Создать композицию</button>
   </section>
 
   <section id="templates" hidden>
-    <p class="muted">Все сцены со страницы «Примеры композиций» доступны автоматически. Выбери готовую расстановку, замени предметы и палитру или повтори оригинал.</p>
     <div id="template-catalog-status" class="muted" aria-live="polite"></div>
     <label for="template-select">Готовые композиции</label>
     <select id="template-select"></select>
-    <details id="template-catalog-details"><summary>Состав набора шаблонов</summary><div id="template-catalog-list" class="muted"></div></details>
+    <div class="template-workbench">
+    <div class="template-preview-area">
+    <img id="template-image" class="preview" style="width:100%;height:180px" alt="Предпросмотр композиции" hidden>
+    <p id="template-size" class="muted"></p>
+    </div>
+    <div class="template-edit-area">
+    <h3 id="template-subjects-heading">Заменить предметы</h3>
+    <div id="template-slots"></div>
+    <div id="template-decoration"></div>
+    <p id="template-fixed-note" class="muted">Остальное останется как в образце.</p>
+    <details><summary>Размер изображения</summary>
+    <label for="template-scale">Масштаб, %</label>
+    <input id="template-scale" type="number" min="10" max="400" step="1" value="100" required>
+    <p class="muted" id="template-output-size"></p>
+    </details>
+    <label for="template-palette">Палитра копии</label>
+    <select id="template-palette"></select>
+    </div>
+    </div>
     <details>
     <summary>Добавить свою расстановку</summary>
     <label for="template-name">Название нового шаблона</label>
     <input id="template-name" maxlength="120" placeholder="Например: Телефон и пазлы — квадрат">
-    <button id="template-save" style="width:100%;margin-top:10px">Сохранить выделенный фрейм / группу</button>
-    <p class="muted">На странице «Примеры композиций» выдели целиком фрейм «Фон», затем сохрани его здесь. Шаблон ссылается на источник: изменения источника попадут в следующие копии.</p>
+    <button id="template-save" style="width:100%;margin-top:10px">Сохранить выделенную сцену</button>
+    <p class="muted">Выделите готовую сцену в Figma и сохраните её как шаблон.</p>
     </details>
-    <img id="template-image" class="preview" style="width:100%;height:180px" alt="Предпросмотр композиции" hidden>
-    <p id="template-size" class="muted"></p>
-    <h3>Предметы в расстановке</h3>
-    <p class="muted">Оставь исходные объекты или замени их предметами каталога. Новый предмет впишется в место исходного с сохранением пропорций. Авторские перекрытия, линии и фон сохраняются. Выбранный фоновый вариант располагается позади главных предметов.</p>
-    <div id="template-slots"></div>
-    <label for="template-scale">Масштаб шаблона, %</label>
-    <input id="template-scale" type="number" min="10" max="400" step="1" value="100" required>
-    <p class="muted" id="template-output-size"></p>
-    <p class="muted">100% — исходный размер. Холст и вся композиция масштабируются вместе: квадрат остаётся квадратом, пропорции оригинала сохраняются.</p>
-    <label for="template-palette">Палитра копии</label>
-    <select id="template-palette"></select>
-    <button id="template-create" class="primary" style="width:100%;margin-top:12px" disabled>Создать композицию</button>
   </section>
 
   <section id="library" hidden>
@@ -138,7 +187,7 @@
       <button id="refresh">Обновить список</button>
       <button id="select-current">Добавить выделенное в Figma</button>
     </div>
-    <label for="candidate">Незарегистрированные ресурсы</label>
+    <label for="candidate">Новые элементы из Figma</label>
     <select id="candidate"></select>
     <div class="muted" id="candidate-count"></div>
     <img class="preview" id="candidate-preview" alt="Предпросмотр ресурса" hidden>
@@ -175,7 +224,7 @@
         <p class="muted">Назначь цвета из найденного ресурса. Тёмный, средний и светлый обязательны.</p>
         <div id="color-roles"></div>
       </div>
-      <button id="register" class="primary" style="width:100%;margin-top:12px">Зарегистрировать</button>
+      <button id="register" class="primary" style="width:100%;margin-top:12px">Добавить в библиотеку</button>
     </div>
 
     <div id="conflict" class="panel" hidden>
@@ -191,15 +240,19 @@
       <p><button id="cancel-conflict" style="width:100%">Отмена</button></p>
     </div>
 
-    <h3>Управление вариантами</h3>
+    <details><summary>Варианты и история предметов</summary>
     <label for="manage-asset">Объект каталога</label>
     <select id="manage-asset"></select>
     <div class="panel" id="variant-list"></div>
+    </details>
   </section>
 
   <section id="palettes" hidden>
-    <p class="muted">Палитры хранятся в этом Figma-файле и доступны после перезапуска. Это цветовые схемы, а не предметы композиции.</p>
-    <label for="palette-file">Добавить палитру из JSON</label>
+    <h3>Выберите цвета</h3>
+    <div id="palette-list"></div>
+    <button id="palette-from-figma" style="width:100%;margin-top:14px">Добавить из выделенного в Figma</button>
+    <details><summary>Загрузить палитру из файла</summary>
+    <label for="palette-file">Файл палитры (.json)</label>
     <input type="file" id="palette-file" accept=".json,application/json">
     <details>
       <summary>Вставить JSON вручную</summary>
@@ -207,18 +260,10 @@
       <textarea id="palette-json" rows="6" maxlength="16384" placeholder='{"name":"Моя палитра","dark":"#334455","medium":"#8899AA","light":"#DDEEFF"}'></textarea>
       <button id="palette-import" style="width:100%;margin-top:8px">Сохранить палитру в файле</button>
     </details>
-    <p class="muted">Нужны name, dark, medium и light в формате #RRGGBB. Также можно задать pale, pink, pinkLight, yellow. Поддерживается вложенный объект colors. При совпадении названия ничего не перезаписывается.</p>
+    <details><summary>Как подготовить файл палитры</summary><p class="muted">Нужны name, dark, medium и light в формате #RRGGBB. Дополнительно: pale, pink, pinkLight, yellow. Можно вложить цвета в colors. Палитра с тем же названием не перезаписывается.</p></details>
+    </details>
     <div id="palette-feedback" aria-live="polite"></div>
-    <h3>Доступные палитры</h3>
-    <div id="palette-list"></div>
   </section>
-
-  <div id="svg-export" class="panel">
-    <strong>Экспорт SVG</strong>
-    <p class="muted">После создания композиция выделяется автоматически. Для другого результата выдели его фрейм или группу целиком.</p>
-    <button id="export-svg" style="width:100%">Скачать выделенную композицию</button>
-    <p id="export-feedback" aria-live="polite" class="muted"></p>
-  </div>
 
   <div id="composition-adjustment" class="panel" hidden>
     <strong>Второстепенным предметам не хватает места</strong>
@@ -227,7 +272,17 @@
     <button id="composition-adjustment-accept" class="primary">Уменьшить и создать</button>
     <button id="composition-adjustment-cancel">Вернуться к настройкам</button>
   </div>
-  <div id="status">Загрузка библиотеки…</div>
+  </main>
+  <footer id="action-bar" class="action-bar">
+    <div class="action-buttons">
+      <button id="create" class="primary" disabled>Создать композицию</button>
+      <button id="template-create" class="primary" disabled hidden>Создать вариацию</button>
+      <div id="svg-export"><button id="export-svg" title="Скачать выбранный в Figma фрейм или группу">Скачать SVG</button></div>
+    </div>
+    <p id="export-feedback" aria-live="polite"></p>
+  </footer>
+  <div id="status" role="status">Загрузка библиотеки…</div>
+  <button id="resize-window" aria-label="Изменить размер окна" title="Потяните угол, чтобы изменить размер окна"></button>
 
   <script>
     const element = id => document.getElementById(id);
@@ -268,6 +323,29 @@
     let namesTimer;
     let metaphorRequestId = 0;
     let metaphorBusy = false;
+    let interfaceReady = false;
+    let templateCatalogLoaded = false;
+    const sectionCopy = {
+      templates: ["Вариация шаблона", "Готовая расстановка. Замените предметы и выберите цвета."],
+      compose: ["Новая композиция", "Подберите предметы по названиям или теме."],
+      library: ["Библиотека предметов", "Предметы для сцен и их варианты. Здесь можно добавить свои."],
+      palettes: ["Цветовые схемы", "Палитра меняет цвета всей сцены. Здесь можно добавить свою."]
+    };
+    const resizeHandle = element("resize-window");
+    resizeHandle.onpointerdown = event => {
+      const start = { x: event.clientX, y: event.clientY, width: innerWidth, height: innerHeight };
+      resizeHandle.setPointerCapture(event.pointerId);
+      resizeHandle.onpointermove = next => send({ type: "resize-ui",
+        width: start.width + next.clientX - start.x, height: start.height + next.clientY - start.y });
+      resizeHandle.onpointerup = () => { resizeHandle.onpointermove = null; };
+      resizeHandle.onpointercancel = () => { resizeHandle.onpointermove = null; };
+    };
+    resizeHandle.onkeydown = event => {
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+      event.preventDefault();
+      send({ type: "resize-ui", width: innerWidth + (event.key === "ArrowRight" ? 40 : event.key === "ArrowLeft" ? -40 : 0),
+        height: innerHeight + (event.key === "ArrowDown" ? 40 : event.key === "ArrowUp" ? -40 : 0) });
+    };
 
     function invalidateMetaphor() {
       metaphorRequestId++;
@@ -316,7 +394,7 @@
       element("metaphor-selection").hidden = element("compose-mode").value !== "metaphor";
       element("names-selection").hidden = !named;
       element("manual-selection").hidden = named;
-      element("secondary-role-label").textContent = named ? "Роль дополнительных предметов" : "Роль второго";
+      element("secondary-role-label").textContent = named ? "Дополнительные предметы" : "Второй предмет";
       updateCreateButton();
       if (named) requestNames();
     };
@@ -368,18 +446,47 @@
       for (const tab of ["compose", "templates", "library", "palettes"]) {
         element(tab).hidden = tab !== name;
         element(`tab-${tab}`).classList.toggle("current", tab === name);
+        element(`tab-${tab}`).setAttribute("role", "tab");
+        element(`tab-${tab}`).setAttribute("aria-selected", String(tab === name));
+        element(`tab-${tab}`).setAttribute("aria-controls", tab);
+        element(`tab-${tab}`).tabIndex = tab === name ? 0 : -1;
       }
+      element("section-title").textContent = sectionCopy[name][0];
+      element("section-help").textContent = sectionCopy[name][1];
+      element("workspace").scrollTop = 0;
+      ui.create.hidden = name !== "compose";
+      element("template-create").hidden = name !== "templates";
+      element("action-bar").hidden = name !== "compose" && name !== "templates";
       element("svg-export").hidden = name !== "compose" && name !== "templates";
-      if (name === "templates") send({ type: "template-list" });
+      if (name === "templates" && !templateCatalogLoaded) send({ type: "template-list" });
     }
     element("tab-compose").onclick = () => displayTab("compose");
     element("tab-library").onclick = () => displayTab("library");
     element("tab-templates").onclick = () => displayTab("templates");
     element("tab-palettes").onclick = () => displayTab("palettes");
+    element("palette-from-figma").onclick = () => {
+      ui.kind.value = "palette";
+      displayTab("library");
+      updateKind();
+      send({ type: "select-current" });
+    };
+    document.querySelector(".tabs").setAttribute("role", "tablist");
+    document.querySelector(".tabs").setAttribute("aria-label", "Разделы студии");
+    document.querySelector(".tabs").onkeydown = event => {
+      const tabs = ["compose", "templates", "library", "palettes"];
+      const index = tabs.findIndex(tab => event.target.id === `tab-${tab}`);
+      if (index < 0 || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
+        : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      displayTab(tabs[next]);
+      element(`tab-${tabs[next]}`).focus();
+    };
 
     function previewTemplate() {
       element("template-image").hidden = true;
       element("template-slots").replaceChildren();
+      element("template-decoration").replaceChildren();
       templateSlots = [];
       templateDimensions = null;
       element("template-output-size").textContent = "";
@@ -393,39 +500,60 @@
     function renderTemplateSlots(slots) {
       templateSlots = [];
       element("template-slots").replaceChildren();
+      element("template-decoration").replaceChildren();
+      const subjects = slots.filter(slot => slot.kind !== "decoration");
+      const decorations = slots.filter(slot => slot.kind === "decoration");
+      element("template-subjects-heading").hidden = !subjects.length;
+      let decorationPanel = null;
+      if (decorations.length) {
+        decorationPanel = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = `Декор шаблона · ${decorations.length}`;
+        decorationPanel.appendChild(summary);
+        element("template-decoration").appendChild(decorationPanel);
+      }
+      element("template-fixed-note").textContent = subjects.length
+        ? "Остальное останется как в образце." : "Для этой сцены можно изменить цвета и размер.";
       for (const slot of slots) {
         const panel = document.createElement("div");
-        panel.className = "panel";
+        panel.className = "slot-row";
         const label = document.createElement("label");
         const select = document.createElement("select");
         select.id = `slot-${slot.index}`;
         label.htmlFor = select.id;
-        const role = slot.kind === "decoration" ? "Декор" : slot.kind === "primary" ? "Главный предмет" : "Второстепенный предмет";
-        const sourceName = /^(group|frame|vector)(\s+\d+)?$/i.test(slot.name.trim()) ? "слой без названия" : slot.name;
-        label.textContent = `${role} (в оригинале — ${sourceName})`;
-        label.title = slot.name;
+        label.textContent = slot.kind === "decoration" ? "Декор" : slot.name;
+        const role = document.createElement("span");
+        role.className = "slot-role";
+        role.textContent = slot.kind === "primary" ? "Основа" : slot.kind === "secondary" ? "Дополнение" : "Из образца";
+        label.appendChild(role);
         fillSelect(select, [
-          { value: "", label: "Оставить исходный объект" },
+          { value: "", label: "Как в образце" },
           ...assets.map(asset => ({ value: asset.id, label: asset.name }))
         ], false);
         const variantLabel = document.createElement("label");
         const variant = document.createElement("select");
         variant.id = `slot-variant-${slot.index}`;
         variantLabel.htmlFor = variant.id;
-        variantLabel.textContent = "Вариант нового предмета";
+        variantLabel.textContent = "Рисунок и роль";
+        const variantSettings = document.createElement("details");
+        variantSettings.className = "slot-variant";
+        const variantSummary = document.createElement("summary");
+        variantSummary.textContent = "Вариант предмета";
+        variantSettings.append(variantSummary, variantLabel, variant);
         const update = () => {
           const asset = assets.find(asset => asset.id === select.value);
           const variants = asset ? asset.variants.filter(item => item.active) : [];
           fillSelect(variant, variants.map(item => ({
-            value: item.id, label: `${item.size} · ${item.role === "main" ? "главный" : "фоновый"}`
+            value: item.id, label: `${item.size === "S" ? "Проще" : "Подробнее"} · ${item.role === "main" ? "основной" : "фоновый"}`
           })), false);
-          variant.hidden = !asset;
-          variantLabel.hidden = !asset;
+          const preferred = variants.find(item => item.size === "L" && item.role === "main") ?? variants[0];
+          if (preferred) variant.value = preferred.id;
+          variantSettings.hidden = !asset || variants.length < 2;
         };
         select.onchange = update;
         update();
-        panel.append(label, select, variantLabel, variant);
-        element("template-slots").appendChild(panel);
+        panel.append(label, select, variantSettings);
+        (slot.kind === "decoration" ? decorationPanel : element("template-slots")).appendChild(panel);
         templateSlots.push({ id: slot.id, select, variant });
       }
     }
@@ -510,13 +638,13 @@
         const line = document.createElement("div");
         line.className = "variant";
         const name = document.createElement("span");
-        name.textContent = `${variant.size}/${variant.role}${variant.active ? " · активный" : " · сохранён"}`;
+        name.textContent = `${variant.size === "S" ? "Проще" : "Подробнее"} · ${variant.role === "main" ? "основной" : "фоновый"}${variant.active ? " · используется" : " · сохранён"}`;
         line.appendChild(name);
         if (!variant.active) {
           const current = asset.variants.find(other => other.active && other.size === variant.size && other.role === variant.role);
           if (current) {
             const button = document.createElement("button");
-            button.textContent = "Активировать";
+            button.textContent = "Использовать";
             button.onclick = () => {
               if (button.dataset.confirm !== "yes") {
                 button.dataset.confirm = "yes";
@@ -535,6 +663,7 @@
     ui.manageAsset.onchange = renderVariants;
 
     function updateReady(message) {
+      if (JSON.stringify(assets) !== JSON.stringify(message.assets)) templateCatalogLoaded = false;
       assets = message.assets;
       element("available-names").textContent = assets.map(asset => asset.name).join(", ");
       candidates = message.candidates;
@@ -548,22 +677,50 @@
       fillSelect(element("template-palette"), message.palettes.map(item => ({ value: item.id, label: item.name })));
       element("palette-list").replaceChildren();
       for (const palette of message.palettes) {
-        const row = document.createElement("p");
-        row.textContent = palette.name;
+        const row = document.createElement("button");
+        row.className = "palette-card";
+        row.dataset.palette = palette.id;
+        row.setAttribute("aria-pressed", String(ui.palette.value === palette.id));
+        const name = document.createElement("span");
+        name.textContent = palette.name;
+        const swatches = document.createElement("div");
+        swatches.className = "palette-swatches";
+        swatches.setAttribute("aria-hidden", "true");
+        for (const role of ["dark", "medium", "light", "pink", "yellow"]) {
+          if (!palette.colors?.[role]) continue;
+          const swatch = document.createElement("span");
+          swatch.style.backgroundColor = palette.colors[role];
+          swatches.appendChild(swatch);
+        }
+        row.append(name, swatches);
+        row.onclick = () => {
+          ui.palette.value = palette.id;
+          element("template-palette").value = palette.id;
+          updatePaletteCards();
+          ui.status.textContent = `Палитра «${palette.name}» выбрана для следующей сцены`;
+        };
         element("palette-list").appendChild(row);
       }
       fillSelect(ui.existingAsset, assets.map(asset => ({ value: asset.id, label: asset.name })));
       fillSelect(ui.manageAsset, assets.map(asset => ({ value: asset.id, label: asset.name })));
-      fillSelect(ui.candidate, candidates.map(item => ({
-        value: item.nodeId, label: `${item.name} · ${item.size}/${item.role} (${item.nodeId})`
+      fillSelect(ui.candidate, candidates.map((item, index) => ({
+        value: item.nodeId, label: `${/^(Group|Frame)(\s|$)/i.test(item.name) ? `Элемент ${index + 1}` : item.name} · ${item.role === "main" ? "основной" : "фоновый"}`
       })));
-      ui.candidateCount.textContent = `Ожидают регистрации: ${candidates.length}`;
+      ui.candidateCount.textContent = `Новых элементов: ${candidates.length}`;
       renderVariants();
       selectCandidate();
-      ui.status.textContent = `Каталог: ${assets.length} объектов, ${message.palettes.length} палитр`;
+      ui.status.textContent = "Можно начинать";
       updateCreateButton();
       requestNames();
+      if (!interfaceReady) { interfaceReady = true; displayTab("templates"); }
     }
+
+    function updatePaletteCards() {
+      for (const card of document.querySelectorAll(".palette-card")) {
+        card.setAttribute("aria-pressed", String(card.dataset.palette === ui.palette.value));
+      }
+    }
+    ui.palette.onchange = updatePaletteCards;
 
     function importPalette(raw) {
       if (paletteImportBusy) return;
@@ -660,6 +817,7 @@
           element("palette-import").disabled = false;
           ui.palette.value = message.id;
           element("template-palette").value = message.id;
+          updatePaletteCards();
           element("palette-feedback").textContent = `«${message.name}» сохранена в Figma-файле и выбрана для следующих композиций.`;
           break;
         case "svg-exported": {
@@ -683,6 +841,17 @@
           element("metaphor-pick").disabled = false;
           const feedback = element("metaphor-feedback");
           feedback.replaceChildren();
+          let explanation = feedback;
+          if (!message.errors.length) {
+            const note = document.createElement("p");
+            note.textContent = `Подобрали предметы: ${message.items.length}. Состав ниже можно изменить.`;
+            const details = document.createElement("details");
+            const summary = document.createElement("summary");
+            summary.textContent = "Почему эти предметы";
+            details.appendChild(summary);
+            feedback.append(note, details);
+            explanation = details;
+          }
           for (const text of message.errors.length ? message.errors : [
             `Темы: ${message.themes.join(", ")}.`,
             ...message.items.map((item, index) => `${index === 0 ? "Главный" : "Дополнительный"}: ${item.name}. ${item.reason}`),
@@ -691,7 +860,7 @@
             const line = document.createElement("p");
             line.textContent = text;
             if (message.errors.length) line.style.color = "var(--figma-color-text-danger, #b42318)";
-            feedback.appendChild(line);
+            explanation.appendChild(line);
           }
           element("object-names").value = message.errors.length ? "" : message.items.map(item => item.name).join("\n");
           requestNames();
@@ -707,7 +876,7 @@
           feedback.replaceChildren();
           if (message.items.length) {
             const found = document.createElement("p");
-            found.textContent = message.items.map((item, index) => `${index + 1}. ${item.name} (${item.size}, ${item.role === "main" ? "главный" : "фоновый"})`).join("; ");
+            found.textContent = `Предметы найдены: ${message.items.length}`;
             feedback.appendChild(found);
           }
           for (const text of [...message.errors, ...message.warnings]) {
@@ -734,15 +903,10 @@
           element("composition-adjustment").scrollIntoView({ block: "nearest" });
           break;
         case "templates":
+          templateCatalogLoaded = true;
           fillSelect(element("template-select"), message.templates.map(item => ({ value: item.id,
             label: `${item.origin === "example" ? "Пример" : "Свой"}: ${item.name}` })));
-          element("template-catalog-status").textContent = `Исходных примеров: ${message.exampleCount ?? 0}. Доступных шаблонов: ${message.templates.length}.`;
-          element("template-catalog-list").replaceChildren();
-          for (const item of message.templates) {
-            const line = document.createElement("p");
-            line.textContent = `${item.origin === "example" ? "Пример" : "Свой"}: ${item.name}`;
-            element("template-catalog-list").appendChild(line);
-          }
+          element("template-catalog-status").textContent = `${message.templates.length} готовых сцен`;
           for (const warning of message.warnings ?? []) {
             const line = document.createElement("p");
             line.textContent = warning;
@@ -758,7 +922,7 @@
           if (message.id !== element("template-select").value) break;
           element("template-image").src = message.image;
           element("template-image").hidden = false;
-          element("template-size").textContent = `${Math.round(message.width)} × ${Math.round(message.height)} · векторный источник`;
+          element("template-size").textContent = `${Math.round(message.width)} × ${Math.round(message.height)}`;
           templateDimensions = { width: message.width, height: message.height };
           updateTemplateOutputSize();
           element("template-create").disabled = false;
