@@ -33,9 +33,11 @@ import { planAutomaticScene } from "./automatic-scene-planner.js";
 import { handleTemplateMessage } from "./template-messages.js";
 import { requestCompositionAdjustment } from "./composition-adjustments.js";
 import { postNamedCompositionResolution } from "./named-composition.js";
-import { postMetaphorComposition } from "./metaphor-composition.js";
+import { postMetaphorComposition, resolveMetaphorSelection } from "./metaphor-composition.js";
 import { preparePaletteImport } from "./palette-import.js";
 import { exportSelectedComposition } from "./figma-svg-export.js";
+import { handleSceneMessage } from "./scene-messages.js";
+import { postSceneEditorState, getEditableScene } from "./figma-scene-editor.js";
 
 const formats = {
   landscape: { width: 1200, height: 800 },
@@ -509,10 +511,15 @@ async function main(): Promise<void> {
         palette = resolvePalette(message.palette);
       }
 
-      const named = message.mode === "names" ? postNamedCompositionResolution(
+      const named = message.mode === "metaphor" ? resolveMetaphorSelection(
+        typeof message.query === "string" ? message.query : "", catalog, size, secondaryRole
+      ) : message.mode === "names" ? postNamedCompositionResolution(
         typeof message.names === "string" ? message.names : "", catalog, size, secondaryRole
       ) : null;
-      if (named?.errors.length) return;
+      if (named?.errors.length) {
+        if (message.mode === "metaphor") throw new Error(named.errors.join(" "));
+        return;
+      }
 
       const selection = named ? named.selection.map(item => ({
         id: item.asset.id.value, role: item.variant.role, emphasis: item.emphasis
@@ -639,6 +646,8 @@ async function main(): Promise<void> {
         const message =
           unknownMessage as Record<string, unknown>;
 
+        if (await handleSceneMessage(message, state)) return;
+
         if (await handleTemplateMessage(message, {
           palettes: state.palettes,
           paletteSourceIds: paletteSourceNodeIds(state.palettes),
@@ -663,7 +672,8 @@ async function main(): Promise<void> {
             break;
           }
           case "export-svg": {
-            const result = await exportSelectedComposition(paletteSourceNodeIds(state.palettes));
+            const scene = typeof message.sceneId === "string" ? await getEditableScene(message.sceneId) : undefined;
+            const result = await exportSelectedComposition(paletteSourceNodeIds(state.palettes), scene);
             figma.ui.postMessage({ type: "svg-exported", ...result });
             break;
           }
@@ -868,6 +878,7 @@ async function main(): Promise<void> {
       return messageQueue;
     };
 
+    figma.on("selectionchange", () => postSceneEditorState());
     sendReady();
   } catch (error) {
     console.error(

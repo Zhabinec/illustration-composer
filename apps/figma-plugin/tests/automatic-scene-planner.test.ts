@@ -81,7 +81,7 @@ describe("scene layer ordering", () => {
   it("renders the support below the subject and all backgrounds below main", async () => {
     const sources = [source("wallet", 600, 400), source("book", 1400, 1000)];
     const clones: string[] = [];
-    const frame = { id: "result", resize: vi.fn(), remove: vi.fn() };
+    const frame = { id: "result", resize: vi.fn(), remove: vi.fn(), setSharedPluginData: vi.fn() };
     vi.stubGlobal("figma", { currentPage: { children: [] }, createFrame: () => frame });
     const renderer = Reflect.construct(FigmaSceneRenderer, [{ cloneInto: async (key: string) => {
       clones.push(key);

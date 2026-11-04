@@ -14,6 +14,8 @@ export class FigmaSceneRenderer {
     try {
       frame.name = name;
       frame.resize(scene.width, scene.height);
+      frame.setSharedPluginData("illustrationComposer", "scene", "1");
+      frame.setSharedPluginData("illustrationComposer", "palette-id", palette.id);
       if (scene.background) {
         const hex = sourceColors[scene.background];
         frame.fills = [{ type: "SOLID", color: {

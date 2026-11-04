@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AssetCatalog, AssetId } from "@illustration-composer/core";
-import { postMetaphorComposition, resolveMetaphorComposition } from "../src/metaphor-composition.js";
+import { postMetaphorComposition, resolveMetaphorComposition, resolveMetaphorSelection } from "../src/metaphor-composition.js";
 
 const ids = ["coin", "wallet", "phone", "book", "pen", "lamp", "folder", "puzzle", "headphones"];
 const catalog = new AssetCatalog(ids.map(id => ({ id: AssetId.create(id), name: id, tags: [],
@@ -8,6 +8,17 @@ const catalog = new AssetCatalog(ids.map(id => ({ id: AssetId.create(id), name: 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Metaphors from the source library", () => {
+  it("creates a selection directly from the title without a previous names request", () => {
+    const result = resolveMetaphorSelection("Финансовая безопасность", catalog, "L", "main");
+    expect(result.errors).toEqual([]);
+    expect(result.selection.map(item => item.asset.id.value)).toEqual(["coin", "wallet"]);
+    expect(result.selection.map(item => item.variant.resourceKey)).toEqual(["coin", "wallet"]);
+  });
+  it("rejects an unknown metaphor or missing requested role before creating a scene", () => {
+    expect(resolveMetaphorSelection("Дракон на луне", catalog, "L", "main").selection).toEqual([]);
+    expect(resolveMetaphorSelection("Дракон на луне", catalog, "L", "main").errors.length).toBeGreaterThan(0);
+    expect(resolveMetaphorSelection("Финансовая безопасность", catalog, "L", "background").errors.length).toBeGreaterThan(0);
+  });
   it.each([
     ["Финансовая безопасность", "coin", "wallet"],
     ["Учёба и новые знания", "book", "pen"],

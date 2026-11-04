@@ -55,6 +55,10 @@ const originalColorRoles = new Map<string, ColorRole>(
 
 const hexPattern = /^#[0-9A-Fa-f]{6}$/;
 
+export function getSourceColorRole(color: string): ColorRole | undefined {
+  return originalColorRoles.get(color.toUpperCase());
+}
+
 export function getReplacementColor(
   sourceColor: string,
   palette: ColorPalette

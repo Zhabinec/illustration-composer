@@ -1,17 +1,26 @@
-import { selectLocalMetaphor, validateSemanticSelection } from "@illustration-composer/core";
-import type { AssetCatalog } from "@illustration-composer/core";
+import { selectLocalMetaphor, validateSemanticSelection, selectCompositionAssets } from "@illustration-composer/core";
+import type { AssetCatalog, AssetSize, AssetRole } from "@illustration-composer/core";
 import { libraryConcepts, libraryProfiles } from "./library-semantics.js";
 
-export function resolveMetaphorComposition(query: string, catalog: AssetCatalog) {
+function resolveMetaphorAssets(query: string, catalog: AssetCatalog) {
   const result = selectLocalMetaphor(query, catalog, libraryConcepts, libraryProfiles);
   const validated = result.errors.length ? { assets: [], errors: result.errors }
     : validateSemanticSelection(result.suggestions, catalog);
-  return {
-    errors: validated.errors, themes: result.themes,
-    items: validated.assets.map((asset, index) => ({
+  return { ...validated, themes: result.themes, suggestions: result.suggestions };
+}
+
+export function resolveMetaphorComposition(query: string, catalog: AssetCatalog) {
+  const result = resolveMetaphorAssets(query, catalog);
+  return { errors: result.errors, themes: result.themes,
+    items: result.assets.map((asset, index) => ({
       id: asset.id.value, name: asset.name, reason: result.suggestions[index]!.reason
-    }))
-  };
+    })) };
+}
+
+export function resolveMetaphorSelection(query: string, catalog: AssetCatalog, size: AssetSize, role: AssetRole) {
+  const result = resolveMetaphorAssets(query, catalog);
+  return result.errors.length ? { selection: [], errors: result.errors, warnings: [] }
+    : selectCompositionAssets(result.assets, size, role);
 }
 
 export function postMetaphorComposition(query: string, catalog: AssetCatalog, requestId: number) {

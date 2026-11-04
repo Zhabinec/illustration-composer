@@ -38,12 +38,12 @@ export function assertVectorSvg(svg: string): void {
   }
 }
 
-export async function exportSelectedComposition(paletteSourceIds: readonly string[]) {
+export async function exportSelectedComposition(paletteSourceIds: readonly string[], scene?: FrameNode) {
   const selection = figma.currentPage.selection;
-  if (selection.length !== 1 || !selection[0]) {
+  if (!scene && (selection.length !== 1 || !selection[0])) {
     throw new Error("Выдели один фрейм или группу готовой композиции для экспорта.");
   }
-  const source = selection[0];
+  const source = scene ?? selection[0]!;
   assertVectorComposition(source);
   if ([source, ...source.findAll(() => true)].some(node => paletteSourceIds.includes(node.id))) {
     throw new Error("Ресурс палитры нельзя экспортировать как композицию.");

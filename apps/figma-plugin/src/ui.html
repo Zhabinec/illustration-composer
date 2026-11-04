@@ -37,6 +37,7 @@
     details[open] > summary { color: var(--figma-color-text, #222); }
     .inline > * { flex: 1; min-width: 0; }
     .muted { color: var(--figma-color-text-secondary, #777); font-size: 12px; }
+    fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
     .panel { border: 1px solid var(--figma-color-border, #ddd); border-radius: 10px; padding: 12px; margin: 10px 0; }
     .slot-row { padding: 10px 0; border-bottom: 1px solid var(--figma-color-border, #e6e6eb); }
     .slot-row:last-child { border-bottom: 0; }
@@ -89,21 +90,56 @@
   <main id="workspace">
 
   <section id="compose">
-    <label for="compose-mode">Выбор предметов</label>
+    <details id="scene-editor" hidden open>
+      <summary>Редактировать композицию на холсте</summary>
+      <p id="scene-info" class="muted"></p>
+      <label for="scene-object">Предмет на холсте</label>
+      <select id="scene-object"></select>
+      <fieldset id="scene-object-actions">
+        <div class="inline">
+          <label>X<input id="scene-x" type="number" step="1"></label>
+          <label>Y<input id="scene-y" type="number" step="1"></label>
+          <label>Поворот, °<input id="scene-rotation" type="number" step="1"></label>
+        </div>
+        <button id="scene-transform" style="width:100%">Применить положение</button>
+        <div class="inline" style="margin-top:8px">
+          <button id="scene-backward">На слой ниже</button><button id="scene-forward">На слой выше</button>
+        </div>
+        <div class="inline" style="margin-top:8px">
+          <button id="scene-duplicate">Дублировать</button><button id="scene-delete" class="danger">Удалить предмет</button>
+        </div>
+      </fieldset>
+      <h3>Добавить из библиотеки</h3>
+      <label for="scene-add-asset">Предмет</label><select id="scene-add-asset"></select>
+      <div class="inline">
+        <label>Рисунок<select id="scene-add-size"><option value="L">Подробный</option><option value="S">Упрощённый</option></select></label>
+        <label>Роль<select id="scene-add-role"><option value="main">Основной</option><option value="background">Фоновый</option></select></label>
+      </div>
+      <button id="scene-add" style="width:100%;margin-top:8px">Добавить на этот холст</button>
+      <details>
+        <summary>Размер и цвета холста</summary>
+        <div class="inline"><label>Ширина<input id="scene-width" type="number" min="100" max="10000"></label><label>Высота<input id="scene-height" type="number" min="100" max="10000"></label></div>
+        <label for="scene-palette">Палитра композиции</label><select id="scene-palette"></select>
+        <button id="scene-settings" style="width:100%;margin-top:8px">Применить размер и палитру</button>
+      </details>
+      <p class="muted">Изменения можно отменить в Figma: Ctrl+Z.</p>
+    </details>
+    <h3 id="compose-new-title" hidden>Новая композиция</h3>
+    <label for="compose-mode">Как собрать композицию</label>
     <select id="compose-mode">
-      <option value="names">По названиям</option>
       <option value="metaphor">По метафоре / заголовку</option>
+      <option value="names">По названиям предметов</option>
       <option value="manual">Из каталога — два предмета</option>
     </select>
-    <div id="metaphor-selection" hidden>
+    <div id="metaphor-selection">
       <label for="metaphor-query">Метафора или заголовок</label>
       <textarea id="metaphor-query" rows="2" maxlength="500" placeholder="Финансовая безопасность" aria-describedby="metaphor-help metaphor-feedback"></textarea>
-      <p id="metaphor-help" class="muted">Предложим предметы из библиотеки. Состав можно изменить.</p>
+      <p id="metaphor-help" class="muted">Введите тему и нажмите «Создать композицию». Предметы подберутся автоматически.</p>
       <details><summary>Какие темы доступны</summary><p class="muted">Подбор понимает финансы, безопасность, обучение, идеи, технологии, команду, работу и музыку. Произвольные темы пока не поддерживаются.</p></details>
-      <button id="metaphor-pick" style="width:100%">Подобрать предметы</button>
+      <button id="metaphor-pick" style="width:100%">Посмотреть и изменить подбор</button>
       <div id="metaphor-feedback" aria-live="polite"></div>
     </div>
-    <div id="names-selection">
+    <div id="names-selection" hidden>
       <label for="object-names">Названия предметов</label>
       <textarea id="object-names" rows="3" maxlength="1000" placeholder="Монета, кошелёк, телефон" aria-describedby="names-help names-feedback"></textarea>
       <p class="muted" id="names-help">До 8 предметов через запятую. Первый — главный.</p>
@@ -149,6 +185,7 @@
     </div>
     <label for="palette">Палитра</label>
     <select id="palette"></select>
+    <button id="scene-new" style="width:100%;margin-top:12px">Пустой холст для ручной сборки</button>
   </section>
 
   <section id="templates" hidden>
@@ -324,6 +361,8 @@
     let namesTimer;
     let metaphorRequestId = 0;
     let metaphorBusy = false;
+    let metaphorSelectionEdited = false;
+    let editingScene = null;
     let interfaceReady = false;
     let templateCatalogLoaded = false;
     const sectionCopy = {
@@ -353,8 +392,15 @@
       metaphorBusy = false;
       element("metaphor-pick").disabled = false;
       element("metaphor-feedback").textContent = "";
+      metaphorSelectionEdited = false;
+      updateCreateButton();
     }
-    element("metaphor-query").oninput = invalidateMetaphor;
+    element("metaphor-query").oninput = () => {
+      invalidateMetaphor();
+      element("object-names").value = "";
+      element("names-selection").hidden = true;
+      requestNames();
+    };
     element("metaphor-pick").onclick = () => {
       cancelAdjustment();
       metaphorBusy = true;
@@ -366,8 +412,10 @@
     };
 
     function updateCreateButton() {
-      const ready = element("compose-mode").value !== "manual"
-        ? namesValid : Boolean(ui.primary.value && ui.secondary.value);
+      const mode = element("compose-mode").value;
+      const ready = mode === "metaphor" && !metaphorSelectionEdited
+        ? Boolean(element("metaphor-query").value.trim())
+        : mode !== "manual" ? namesValid : Boolean(ui.primary.value && ui.secondary.value);
       ui.create.disabled = compositionBusy || metaphorBusy || !ready;
     }
 
@@ -384,6 +432,7 @@
         size: ui.size.value, secondaryRole: ui.secondaryRole.value });
     }
     element("object-names").oninput = () => {
+      if (element("compose-mode").value === "metaphor") metaphorSelectionEdited = true;
       namesValid = false;
       updateCreateButton();
       clearTimeout(namesTimer);
@@ -393,7 +442,8 @@
       invalidateMetaphor();
       const named = element("compose-mode").value !== "manual";
       element("metaphor-selection").hidden = element("compose-mode").value !== "metaphor";
-      element("names-selection").hidden = !named;
+      element("names-selection").hidden = !named ||
+        (element("compose-mode").value === "metaphor" && !element("object-names").value.trim());
       element("manual-selection").hidden = named;
       element("secondary-role-label").textContent = named ? "Дополнительные предметы" : "Второй предмет";
       updateCreateButton();
@@ -429,6 +479,37 @@
     function send(message) {
       parent.postMessage({ pluginMessage: message }, "*");
     }
+
+    function sceneCommand(type, data = {}) {
+      if (!editingScene) return;
+      send({ type, sceneId: editingScene.id, nodeId: element("scene-object").value,
+        palette: element("scene-palette").value || ui.palette.value, ...data });
+    }
+    function showSceneObject() {
+      const item = editingScene?.items.find(item => item.id === element("scene-object").value);
+      element("scene-object-actions").disabled = !item;
+      for (const [field, value] of [["scene-x", item?.x], ["scene-y", item?.y], ["scene-rotation", item?.rotation]]) {
+        element(field).value = value === undefined ? "" : Math.round(value * 100) / 100;
+      }
+    }
+    element("scene-object").onchange = () => { showSceneObject(); sceneCommand("scene-select"); };
+    element("scene-transform").onclick = () => sceneCommand("scene-transform", {
+      x: Number(element("scene-x").value), y: Number(element("scene-y").value), rotation: Number(element("scene-rotation").value)
+    });
+    element("scene-duplicate").onclick = () => sceneCommand("scene-duplicate");
+    element("scene-delete").onclick = () => sceneCommand("scene-delete");
+    element("scene-forward").onclick = () => sceneCommand("scene-layer", { direction: "forward" });
+    element("scene-backward").onclick = () => sceneCommand("scene-layer", { direction: "backward" });
+    element("scene-add").onclick = () => sceneCommand("scene-add", {
+      assetId: element("scene-add-asset").value, size: element("scene-add-size").value, role: element("scene-add-role").value
+    });
+    element("scene-settings").onclick = () => sceneCommand("scene-settings", {
+      width: Number(element("scene-width").value), height: Number(element("scene-height").value)
+    });
+    element("scene-new").onclick = () => {
+      const dimensions = { landscape: [1200, 800], square: [1000, 1000], portrait: [800, 1200] }[ui.format.value];
+      send({ type: "scene-new", width: dimensions[0], height: dimensions[1], palette: ui.palette.value });
+    };
 
     function fillSelect(select, options, preserve = true) {
       const previous = preserve ? select.value : "";
@@ -671,10 +752,12 @@
       fillSelect(ui.primary, assets.filter(asset => asset.variants.some(item => item.active && item.role === "main"))
         .map(asset => ({ value: asset.id, label: asset.name })));
       fillSelect(ui.secondary, assets.map(asset => ({ value: asset.id, label: asset.name })));
+      fillSelect(element("scene-add-asset"), assets.map(asset => ({ value: asset.id, label: asset.name })));
       if (!ui.primary.value && assets.some(item => item.id === "wallet")) ui.primary.value = "wallet";
       if (!ui.secondary.value && assets.some(item => item.id === "coin")) ui.secondary.value = "coin";
       updateCreateButton();
       fillSelect(ui.palette, message.palettes.map(item => ({ value: item.id, label: item.name })));
+      fillSelect(element("scene-palette"), message.palettes.map(item => ({ value: item.id, label: item.name })));
       fillSelect(element("template-palette"), message.palettes.map(item => ({ value: item.id, label: item.name })));
       element("palette-list").replaceChildren();
       for (const palette of message.palettes) {
@@ -713,7 +796,8 @@
       ui.status.textContent = "Можно начинать";
       updateCreateButton();
       requestNames();
-      if (!interfaceReady) { interfaceReady = true; displayTab("templates"); }
+      if (!interfaceReady) { interfaceReady = true; displayTab("compose"); }
+      send({ type: "scene-state" });
     }
 
     function updatePaletteCards() {
@@ -753,7 +837,7 @@
     element("export-svg").onclick = () => {
       element("export-svg").disabled = true;
       element("export-feedback").textContent = "Экспортируем SVG и проверяем повторным импортом в Figma…";
-      send({ type: "export-svg" });
+      send({ type: "export-svg", ...(editingScene ? { sceneId: editingScene.id } : {}) });
     };
 
     ui.create.onclick = () => {
@@ -762,7 +846,9 @@
       ui.status.textContent = "Создаём композицию…";
       send({
         type: "create", primaryId: ui.primary.value, secondaryId: ui.secondary.value,
-        mode: element("compose-mode").value === "manual" ? "manual" : "names", names: element("object-names").value,
+        mode: element("compose-mode").value === "metaphor" && metaphorSelectionEdited
+          ? "names" : element("compose-mode").value,
+        query: element("metaphor-query").value, names: element("object-names").value,
         size: ui.size.value, secondaryRole: ui.secondaryRole.value,
         layout: ui.layout.value, format: ui.format.value,
         palette: ui.palette.value
@@ -812,6 +898,27 @@
       const message = event.data.pluginMessage;
       if (!message) return;
       switch (message.type) {
+        case "scene-state": {
+          const previousId = editingScene?.id;
+          editingScene = message.scene;
+          element("scene-editor").hidden = !editingScene;
+          element("compose-new-title").hidden = !editingScene;
+          ui.create.textContent = editingScene ? "Создать новую композицию" : "Создать композицию";
+          if (!editingScene) break;
+          element("scene-info").textContent = `${editingScene.name} · ${Math.round(editingScene.width)} × ${Math.round(editingScene.height)}`;
+          const previousObject = element("scene-object").value;
+          fillSelect(element("scene-object"), editingScene.items.map(item => ({ value: item.id, label: item.name })));
+          if (editingScene.selectedId) element("scene-object").value = editingScene.selectedId;
+          else if (editingScene.items.some(item => item.id === previousObject)) element("scene-object").value = previousObject;
+          element("scene-width").value = Math.round(editingScene.width);
+          element("scene-height").value = Math.round(editingScene.height);
+          if (editingScene.paletteId && Array.from(element("scene-palette").options).some(option => option.value === editingScene.paletteId)) {
+            element("scene-palette").value = editingScene.paletteId;
+          }
+          showSceneObject();
+          if (previousId !== editingScene.id) element("scene-editor").open = true;
+          break;
+        }
         case "palette-imported":
           paletteImportBusy = false;
           ui.paletteFile.disabled = false;
@@ -839,6 +946,7 @@
           if (message.requestId !== metaphorRequestId || message.query !== element("metaphor-query").value ||
               element("compose-mode").value !== "metaphor") break;
           metaphorBusy = false;
+          metaphorSelectionEdited = false;
           element("metaphor-pick").disabled = false;
           const feedback = element("metaphor-feedback");
           feedback.replaceChildren();
@@ -864,6 +972,7 @@
             explanation.appendChild(line);
           }
           element("object-names").value = message.errors.length ? "" : message.items.map(item => item.name).join("\n");
+          element("names-selection").hidden = Boolean(message.errors.length);
           requestNames();
           if (message.errors.length) ui.status.textContent = "Подбор не выполнен. Уточни заголовок или укажи названия предметов.";
           break;
@@ -967,6 +1076,7 @@
           updateCreateButton();
           element("template-create").disabled = !element("template-select").value;
           ui.status.textContent = "Композиция создана";
+          send({ type: "scene-state" });
           break;
         case "error":
           if (message.operation === "import-palette") {

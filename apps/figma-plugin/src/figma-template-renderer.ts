@@ -37,6 +37,9 @@ export async function renderCompositionTemplate(
     frame.fills = [];
     const copy = source.clone();
     frame.appendChild(copy);
+    frame.setSharedPluginData("illustrationComposer", "scene", "1");
+    frame.setSharedPluginData("illustrationComposer", "template-content", copy.id);
+    frame.setSharedPluginData("illustrationComposer", "palette-id", palette.id);
     const nodes = await replaceTemplateSlots(source, copy, replacements, new FigmaAssetAdapter(sourceNodeIds));
     if (layout.length) applyTemplateLayout(copy, nodes, layout);
     copy.locked = false;
