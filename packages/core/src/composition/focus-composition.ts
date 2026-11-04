@@ -3,6 +3,7 @@ import type {
   CompositionScene,
   CompositionSource
 } from "./row-composition.js";
+import { spaceCompositionObjects } from "./composition-spacing.js";
 
 export function createFocusComposition(
   width: number,
@@ -66,7 +67,7 @@ export function createFocusComposition(
     primaryY + primaryHeight * 0.65
   );
 
-  return {
+  const scene: CompositionScene = {
     width,
     height,
     items: [
@@ -87,5 +88,23 @@ export function createFocusComposition(
         rotation: 0
       }
     ]
+  };
+  const sources = [primary, secondary];
+  const boxes = spaceCompositionObjects(scene, scene.items.map((item, index) => ({
+    id: String(index), name: item.assetId.value,
+    x: item.x, y: item.y,
+    width: sources[index]!.width * item.scale,
+    height: sources[index]!.height * item.scale,
+    role: item.variant.role,
+    kind: index === 0 ? "primary" : "secondary"
+  })));
+  const shrinkSuggestions = boxes.flatMap((box, index) => box.scale < 1
+    ? [{ assetId: sources[index]!.assetId, scale: box.scale }] : []);
+  return {
+    ...scene,
+    items: scene.items.map((item, index) => ({
+      ...item, x: boxes[index]!.x, y: boxes[index]!.y, scale: item.scale * boxes[index]!.scale
+    })),
+    ...(shrinkSuggestions.length ? { shrinkSuggestions } : {})
   };
 }

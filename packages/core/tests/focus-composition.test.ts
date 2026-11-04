@@ -43,15 +43,15 @@ describe("Focus composition", () => {
     }
   });
 
-  it("places secondary object over the primary area", () => {
+  it("places a secondary main object without covering the primary", () => {
     const scene = createFocusComposition(1200, 800, book, pen);
     const [primary, secondary] = scene.items;
 
-    expect(secondary!.x).toBeGreaterThan(primary!.x);
-    expect(secondary!.x)
-      .toBeLessThan(primary!.x + book.width * primary!.scale);
-    expect(secondary!.y)
-      .toBeLessThan(primary!.y + book.height * primary!.scale);
+    const intersects = secondary!.x < primary!.x + book.width * primary!.scale &&
+      secondary!.x + pen.width * secondary!.scale > primary!.x &&
+      secondary!.y < primary!.y + book.height * primary!.scale &&
+      secondary!.y + pen.height * secondary!.scale > primary!.y;
+    expect(intersects).toBe(false);
   });
 
   it("rejects invalid dimensions", () => {

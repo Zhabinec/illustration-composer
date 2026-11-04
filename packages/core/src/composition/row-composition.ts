@@ -23,6 +23,7 @@ export interface CompositionScene {
   width: number;
   height: number;
   items: readonly CompositionItem[];
+  shrinkSuggestions?: readonly { assetId: AssetId; scale: number }[];
 }
 
 export function createRowComposition(
