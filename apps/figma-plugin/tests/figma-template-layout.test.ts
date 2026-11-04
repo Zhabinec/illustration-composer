@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyTemplateLayout } from "../src/figma-template-layout.js";
+import { applyTemplateLayout, planTemplateLayout } from "../src/figma-template-layout.js";
 import { requestCompositionAdjustment } from "../src/composition-adjustments.js";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -11,6 +11,23 @@ function node(id: string, x: number, y: number) {
 }
 
 describe("Template layout application", () => {
+  it("keeps the author's layout untouched when only the palette or overall scale changes", async () => {
+    const source = { get children() { throw new Error("Original geometry must not be replanned"); } };
+    const adapter = { getDimensions: vi.fn() };
+    expect(await Reflect.apply(planTemplateLayout, undefined, [source, [], adapter])).toEqual([]);
+    expect(adapter.getDimensions).not.toHaveBeenCalled();
+  });
+  it("preserves intentional overlaps when replacing a subject in an authored template", async () => {
+    const base = { ...node("base", 200, 300), name: "Книга", getSharedPluginData: () => "" };
+    const top = { ...node("top", 250, 320), name: "Телефон", getSharedPluginData: () => "" };
+    const result = await Reflect.apply(planTemplateLayout, undefined, [
+      { width: 1000, height: 1000, children: [base, top] },
+      [{ slotId: "top", resourceKey: "wallet", name: "Кошелёк", role: "main" }],
+      { getDimensions: async () => ({ width: 200, height: 100 }) }
+    ]);
+    expect(result.map((item: { x: number; y: number; scale: number }) => [item.x, item.y, item.scale]))
+      .toEqual([[200, 300, 1], [250, 320, 1]]);
+  });
   it("puts a background wallet behind a main coin without moving fixed decoration", () => {
     const coin = node("coin", 200, 300);
     const wallet = node("wallet", 300, 200);

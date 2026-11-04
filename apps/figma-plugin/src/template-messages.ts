@@ -7,6 +7,7 @@ import { getTemplateSlots, resolveTemplateReplacements } from "./figma-template-
 import { planTemplateLayout } from "./figma-template-layout.js";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { requestCompositionAdjustment } from "./composition-adjustments.js";
+import { discoverExampleTemplates, mergeCompositionTemplates } from "./figma-example-templates.js";
 
 interface TemplateContext {
   palettes: readonly ColorPalette[];
@@ -25,9 +26,12 @@ export async function handleTemplateMessage(
 ): Promise<boolean> {
   if (typeof message.type !== "string" || !message.type.startsWith("template-")) return false;
   const store = new FigmaCompositionTemplateStore();
+  const examples = await discoverExampleTemplates(context.paletteSourceIds);
+  const templates = mergeCompositionTemplates(examples.templates, store.list());
   switch (message.type) {
     case "template-list":
-      figma.ui.postMessage({ type: "templates", templates: store.list() });
+      figma.ui.postMessage({ type: "templates", templates,
+        exampleCount: examples.templates.length, warnings: examples.warnings });
       break;
     case "template-save": {
       const selection = figma.currentPage.selection;
@@ -40,12 +44,14 @@ export async function handleTemplateMessage(
       if (nodes.some(node => context.paletteSourceIds.includes(node.id))) {
         throw new Error("Ресурс палитры нельзя использовать как предмет композиции.");
       }
-      const templates = store.add(text(message.name), source.id);
-      figma.ui.postMessage({ type: "templates", templates, selectedId: `template-${source.id}`, saved: true });
+      const saved = store.add(text(message.name), source.id);
+      figma.ui.postMessage({ type: "templates", templates: mergeCompositionTemplates(examples.templates, saved),
+        exampleCount: examples.templates.length, warnings: examples.warnings,
+        selectedId: `template-${source.id}`, saved: true });
       break;
     }
     case "template-preview": {
-      const template = store.list().find(item => item.id === text(message.id));
+      const template = templates.find(item => item.id === text(message.id));
       if (!template) throw new Error("Шаблон не найден.");
       const source = await getVectorComposition(template.sourceNodeId);
       const bytes = await source.exportAsync({ format: "PNG", constraint: { type: "WIDTH", value: 280 } });
@@ -58,7 +64,7 @@ export async function handleTemplateMessage(
       break;
     }
     case "template-create": {
-      const template = store.list().find(item => item.id === text(message.id));
+      const template = templates.find(item => item.id === text(message.id));
       if (!template) throw new Error("Шаблон не найден.");
       const source = await getVectorComposition(template.sourceNodeId);
       if ([source, ...source.findAll(() => true)].some(node => context.paletteSourceIds.includes(node.id))) {

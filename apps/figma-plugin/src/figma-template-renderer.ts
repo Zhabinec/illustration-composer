@@ -38,7 +38,7 @@ export async function renderCompositionTemplate(
     const copy = source.clone();
     frame.appendChild(copy);
     const nodes = await replaceTemplateSlots(source, copy, replacements, new FigmaAssetAdapter(sourceNodeIds));
-    applyTemplateLayout(copy, nodes, layout);
+    if (layout.length) applyTemplateLayout(copy, nodes, layout);
     copy.locked = false;
     copy.rescale(scale);
     copy.rotation = 0;

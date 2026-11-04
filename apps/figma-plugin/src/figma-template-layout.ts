@@ -1,4 +1,4 @@
-import { fitCompositionTemplate, spaceCompositionObjects } from "@illustration-composer/core";
+import { fitCompositionTemplate } from "@illustration-composer/core";
 import type { CompositionBox, SpacedCompositionBox } from "@illustration-composer/core";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { getTemplateSlots } from "./figma-template-slots.js";
@@ -19,6 +19,7 @@ export async function planTemplateLayout(
   replacements: readonly TemplateReplacement[],
   adapter: FigmaAssetAdapter
 ): Promise<SpacedCompositionBox[]> {
+  if (!replacements.length) return [];
   const boxes: CompositionBox[] = [];
   for (const slot of getTemplateSlots(source)) {
     const node = source.children[slot.index];
@@ -35,7 +36,7 @@ export async function planTemplateLayout(
       kind: replacement && slot.kind === "decoration" ? "secondary" : slot.kind,
       role: replacement?.role ?? (storedRole === "background" ? "background" : "main") });
   }
-  return spaceCompositionObjects(source, boxes);
+  return boxes.map(box => ({ ...box, scale: 1 }));
 }
 
 export function applyTemplateLayout(
