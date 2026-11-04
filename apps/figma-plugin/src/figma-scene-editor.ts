@@ -52,6 +52,7 @@ export function postSceneEditorState(scene?: FrameNode): void {
 export async function getEditableScene(id: string): Promise<FrameNode> {
   const scene = await figma.getNodeByIdAsync(id);
   if (!scene || !isComposerScene(scene)) throw new Error("Выделите созданную композицию. Исходную библиотеку редактировать нельзя.");
+  if (scene.getSharedPluginData(namespace, "scene") !== "1") scene.setSharedPluginData(namespace, "scene", "1");
   return scene;
 }
 
@@ -134,7 +135,7 @@ export function resizeScene(scene: FrameNode, width: number, height: number, pal
     child.rescale(scale);
     child.relativeTransform = [[a, c, x * scale + offsetX], [b, d, y * scale + offsetY]];
   }
-  scene.resize(width, height);
+  scene.resizeWithoutConstraints(width, height);
   new FigmaPaletteAdapter().apply(scene, palette);
   scene.setSharedPluginData(namespace, "palette-id", palette.id);
 }

@@ -23,6 +23,7 @@ function canvas(children = [object("coin"), object("wallet")]) {
     parent: { type: "PAGE", name: "Composer Preview" }, children, ...metadata({ scene: "1", "palette-id": "original" }),
     findAll: () => children,
     resize: vi.fn((width: number, height: number) => { frame.width = width; frame.height = height; }),
+    resizeWithoutConstraints: vi.fn((width: number, height: number) => { frame.width = width; frame.height = height; }),
     insertChild: (index: number, node: ReturnType<typeof object>) => {
       const previous = children.indexOf(node);
       if (previous >= 0) children.splice(previous, 1);
@@ -105,7 +106,8 @@ describe("composition editing", () => {
     const frame = canvas(), node = frame.children[0]!;
     node.relativeTransform = [[0, -1, 40], [1, 0, 50]];
     Reflect.apply(resizeScene, undefined, [frame, 600, 800, palettePresets.mint]);
-    expect(frame.resize).toHaveBeenCalledWith(600, 800);
+    expect(frame.resizeWithoutConstraints).toHaveBeenCalledWith(600, 800);
+    expect(frame.resize).not.toHaveBeenCalled();
     expect(node.rescale).toHaveBeenCalledWith(0.5);
     expect(node.relativeTransform).toEqual([[0, -1, 20], [1, 0, 225]]);
     expect(frame.getSharedPluginData("illustrationComposer", "palette-id")).toBe("mint");
@@ -122,6 +124,18 @@ describe("composition editing", () => {
     expect(frame.children.map(node => node.id)).toEqual(["wallet"]);
     expect(target.remove).toHaveBeenCalledOnce();
     expect(commitUndo).toHaveBeenCalledOnce();
+  });
+  it("keeps a legacy canvas editable after its last object is deleted", async () => {
+    const target = object("phone"), frame = Object.assign(canvas([target]), metadata());
+    target.remove.mockImplementation(() => frame.children.splice(0, 1));
+    const postMessage = vi.fn();
+    vi.stubGlobal("figma", { currentPage: { selection: [target] }, ui: { postMessage }, getNodeByIdAsync: async () => frame, commitUndo: vi.fn() });
+    await handleSceneMessage({ type: "scene-delete", sceneId: frame.id, nodeId: target.id, palette: "original" },
+      { version: 1, registry: { assets: [] }, sourceNodeIds: {}, palettes: [] });
+    expect(frame.children).toEqual([]);
+    expect(await getEditableScene(frame.id)).toBe(frame);
+    expect(postMessage.mock.lastCall![0].scene.id).toBe(frame.id);
+    expect(postMessage.mock.lastCall![0].scene.items).toEqual([]);
   });
 });
 

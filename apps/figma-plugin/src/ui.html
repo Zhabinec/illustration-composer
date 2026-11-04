@@ -135,7 +135,7 @@
       <label for="metaphor-query">Метафора или заголовок</label>
       <textarea id="metaphor-query" rows="2" maxlength="500" placeholder="Финансовая безопасность" aria-describedby="metaphor-help metaphor-feedback"></textarea>
       <p id="metaphor-help" class="muted">Введите тему и нажмите «Создать композицию». Предметы подберутся автоматически.</p>
-      <details><summary>Какие темы доступны</summary><p class="muted">Подбор понимает финансы, безопасность, обучение, идеи, технологии, команду, работу и музыку. Произвольные темы пока не поддерживаются.</p></details>
+      <details><summary>Как работает подбор</summary><p class="muted">Подбираем образы этой библиотеки: финансы, защита, знания, идеи, связь, команда, порядок и музыка. Можно вводить выражения вроде «Свет в конце тоннеля» или «Золотой запас». Если подходящих образов нет, попросим уточнить тему.</p></details>
       <button id="metaphor-pick" style="width:100%">Посмотреть и изменить подбор</button>
       <div id="metaphor-feedback" aria-live="polite"></div>
     </div>
@@ -916,7 +916,10 @@
             element("scene-palette").value = editingScene.paletteId;
           }
           showSceneObject();
-          if (previousId !== editingScene.id) element("scene-editor").open = true;
+          if (previousId !== editingScene.id) {
+            element("scene-editor").open = true;
+            element("scene-editor").scrollIntoView({ block: "start" });
+          }
           break;
         }
         case "palette-imported":

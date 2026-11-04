@@ -37,6 +37,23 @@ describe("Metaphors from the source library", () => {
   it("does not confuse an unrelated prefix with an idea", () => {
     expect(resolveMetaphorComposition("Идеальный закат", catalog).items).toEqual([]);
   });
+  it.each([
+    ["Свет в конце тоннеля", "lamp"], ["Светлая мысль", "lamp"], ["Лампочка загорелась", "lamp"],
+    ["Золотой запас под замком", "coin"], ["Подушка безопасности", "coin"], ["Финансы без риска", "coin"],
+    ["Грызть гранит науки", "book"], ["С чистого листа", "book"], ["Открываем новые горизонты", "book"],
+    ["Собрать воедино", "puzzle"], ["Плечом к плечу", "puzzle"], ["Недостающая деталь", "puzzle"],
+    ["Мир на ладони", "phone"], ["Связь без границ", "phone"], ["Всегда на проводе", "phone"],
+    ["Все по полочкам", "folder"], ["Разложить по полочкам", "folder"],
+    ["На одной волне", "headphones"], ["Поймать волну", "headphones"]
+  ])("selects an existing image for the figurative title %s", (query, expected) => {
+    const result = resolveMetaphorSelection(query, catalog, "L", "main");
+    expect(result.errors).toEqual([]);
+    expect(result.selection[0]!.asset.id.value).toBe(expected);
+    expect(result.selection.every(item => ids.includes(item.asset.id.value))).toBe(true);
+  });
+  it("does not interpret an unrelated negation just because another phrase is known", () => {
+    expect(resolveMetaphorComposition("Связь без границ, но не музыка", catalog).errors.length).toBeGreaterThan(0);
+  });
   it("honors the current catalog instead of restoring missing objects", () => {
     const result = resolveMetaphorComposition("Финансовая безопасность", new AssetCatalog(catalog.getAll().filter(asset => asset.id.value !== "coin")));
     expect(result.items.map(item => item.id)).toEqual(["wallet"]);

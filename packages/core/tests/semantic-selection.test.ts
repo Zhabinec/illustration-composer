@@ -43,6 +43,14 @@ describe("Local semantic selection", () => {
   it("returns an error when all matching sources have disappeared", () => {
     expect(selectLocalMetaphor("финансы", new AssetCatalog([]), concepts, profiles).errors).toHaveLength(1);
   });
+  it("matches complete token sequences and does not inflate repeated phrases", () => {
+    const phrases = [{ id: "finance", label: "Финансы", stems: [], phrases: [["золот", "запас"]] }];
+    const result = selectLocalMetaphor("Золотой запас!", catalog, phrases, profiles);
+    expect(result.suggestions[0]?.assetId).toBe("coin");
+    expect(selectLocalMetaphor("Золотой запас, золотой запас", catalog, phrases, profiles)).toEqual(result);
+    expect(selectLocalMetaphor("золотой красивый запас", catalog, phrases, profiles).suggestions).toEqual([]);
+    expect(selectLocalMetaphor("запас золотой", catalog, phrases, profiles).suggestions).toEqual([]);
+  });
   it("puts a main-capable asset first even when a background scores higher", () => {
     const result = selectLocalMetaphor("финансы", new AssetCatalog([asset("coin", false), asset("wallet")]), concepts, profiles);
     expect(result.suggestions.map(item => item.assetId)).toEqual(["wallet", "coin"]);

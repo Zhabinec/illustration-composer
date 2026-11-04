@@ -6,6 +6,7 @@ export interface SemanticConcept {
   id: string;
   label: string;
   stems: readonly string[];
+  phrases?: readonly (readonly string[])[];
 }
 
 export interface SemanticAssetProfile {
@@ -21,10 +22,17 @@ export function selectLocalMetaphor(
   if (!query.trim()) return fail("Введи метафору или заголовок.");
   if (query.length > 500) return fail("Заголовок слишком длинный (максимум 500 символов).");
   const words = normalizeAssetName(query).match(/[\p{L}\p{N}]+/gu) ?? [];
-  if (words.some(word => ["без", "не", "нет", "исключая", "кроме"].includes(word))) {
+  const phraseMatches = concepts.flatMap(concept => (concept.phrases ?? []).flatMap(phrase => {
+    if (!phrase.length) return [];
+    return words.flatMap((_, start) => phrase.every((stem, offset) => words[start + offset]?.startsWith(stem))
+      ? [{ conceptId: concept.id, start, length: phrase.length }] : []);
+  }));
+  if (words.some((word, index) => ["без", "не", "нет", "исключая", "кроме"].includes(word) &&
+    !phraseMatches.some(match => index >= match.start && index < match.start + match.length))) {
     return fail("Локальный подбор пока не учитывает отрицания. Опиши желаемую тему утвердительно, а состав поправь после подбора.");
   }
-  const matched = concepts.filter(concept => concept.stems.some(stem => words.some(word => word.startsWith(stem))));
+  const matched = concepts.filter(concept => phraseMatches.some(match => match.conceptId === concept.id) ||
+    concept.stems.some(stem => words.some(word => word.startsWith(stem))));
   if (!matched.length) return fail("Тема не распознана локальным подбором. Попробуй другой заголовок или выбери предметы по названиям.");
   const matchedIds = new Set(matched.map(item => item.id));
   const candidates = profiles.flatMap(profile => {
