@@ -80,6 +80,24 @@ describe("Vector composition boundary", () => {
 });
 
 describe("Template object replacement", () => {
+  it("offers actual subjects only, without exposing anonymous service groups as supporting objects", () => {
+    const source = { children: [
+      ...Array.from({ length: 20 }, (_, index) => ({ id: `service-${index}`, name: `Group ${index}`, type: "GROUP", width: 1000, height: 1000 })),
+      { id: "phone", name: "Телефон", type: "GROUP", width: 200, height: 100 },
+      { id: "puzzle", name: "Пазлы", type: "GROUP", width: 100, height: 100 }
+    ] };
+    expect(Reflect.apply(getTemplateSlots, undefined, [source])).toEqual([
+      { id: "phone", name: "Телефон", index: 20, kind: "primary" },
+      { id: "puzzle", name: "Пазлы", index: 21, kind: "secondary" }
+    ]);
+    expect(source.children).toHaveLength(22);
+  });
+  it("does not invent supporting objects or decoration in a single-object template", () => {
+    expect(Reflect.apply(getTemplateSlots, undefined, [{ children: [
+      { id: "service", name: "Group", type: "GROUP", width: 900, height: 900 },
+      { id: "phone", name: "Телефон", type: "GROUP", width: 200, height: 100 }
+    ] }])).toEqual([{ id: "phone", name: "Телефон", index: 1, kind: "primary" }]);
+  });
   const slots = [{ id: "slot-phone", name: "Телефон", index: 0, kind: "primary" as const }];
   const registry: LibraryRegistrySnapshot = {
     version: 1,

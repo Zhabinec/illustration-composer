@@ -19,8 +19,10 @@ export interface TemplateReplacement {
 }
 
 export function getTemplateSlots(source: VectorCompositionNode): TemplateSlot[] {
+  const isUnnamed = (name: string): boolean => !name.trim() ||
+    /^(group|frame|vector|rectangle|ellipse|line|path|группа|фрейм|вектор)([\s#_-]*\d+)*$/i.test(name.trim());
   const groups = source.children.flatMap((node, index) =>
-    (node.type === "GROUP" || node.type === "FRAME") && !node.isMask
+    (node.type === "GROUP" || node.type === "FRAME") && !node.isMask && !isUnnamed(node.name)
       ? [{ id: node.id, name: node.name, index, area: node.width * node.height }]
       : []);
   // These are decoration layer names in the supplied reference library.

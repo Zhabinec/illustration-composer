@@ -61,7 +61,7 @@ describe("Default templates from reference examples", () => {
     source.children[1]!.name = "Group 2136136347";
     environment([source]);
     const result = await discoverExampleTemplates([]);
-    expect(result.templates[0]?.name).toBe("Телефон + дополнительные элементы — квадрат, 1000×1000");
+    expect(result.templates[0]?.name).toBe("Телефон — квадрат, 1000×1000");
     expect(source.children[1]!.name).toBe("Group 2136136347");
   });
   it("shows a useful warning when the page is absent", async () => {
