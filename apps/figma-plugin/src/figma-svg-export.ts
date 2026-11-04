@@ -3,12 +3,21 @@ import { assertVectorComposition } from "./figma-vector-composition.js";
 export function normalizeSvgLayerIds(svg: string): string {
   const replacements = new Map<string, string>();
   const result = svg.replace(/(\s+id=")([^"]*)(")/g, (attribute, prefix: string, id: string, suffix: string) => {
-    if (!Array.from(id).every(character => character.charCodeAt(0) <= 255)) return attribute;
+    const entities: Readonly<Record<string, string>> = { quot: '"', apos: "'", amp: "&", lt: "<", gt: ">" };
+    const plainId = id.replace(/&#(x[\da-f]+|\d+);|&(quot|apos|amp|lt|gt);/gi, (entity, number: string | undefined, name: string | undefined) => {
+      if (name) return entities[name.toLowerCase()] ?? entity;
+      const point = number?.startsWith("x") || number?.startsWith("X")
+        ? Number.parseInt(number.slice(1), 16) : Number(number);
+      return point >= 0 && point <= 0x10ffff ? String.fromCodePoint(point) : entity;
+    });
+    if (!Array.from(plainId).every(character => character.charCodeAt(0) <= 255)) return attribute;
     try {
-      const decoded = decodeURIComponent(Array.from(id, character =>
+      const decoded = decodeURIComponent(Array.from(plainId, character =>
         `%${character.charCodeAt(0).toString(16).padStart(2, "0")}`).join(""));
-      if (decoded !== id) replacements.set(id, decoded);
-      return prefix + decoded + suffix;
+      if (decoded === plainId) return attribute;
+      const escaped = decoded.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+      replacements.set(id, escaped);
+      return prefix + escaped + suffix;
     } catch {
       return attribute;
     }

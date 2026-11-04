@@ -31,6 +31,11 @@ describe("Vector SVG export", () => {
     const original = '<svg><g id="Монета"/><g id="Müller"/><path fill="url(#paint)"/></svg>';
     expect(normalizeSvgLayerIds(original)).toBe(original);
   });
+  it("repairs the numeric byte entities produced by the actual Figma exporter and keeps XML escaping", () => {
+    const broken = Array.from(new TextEncoder().encode('Монета & "Кошелёк"'), byte => `&#${byte};`).join("");
+    expect(normalizeSvgLayerIds(`<svg><g id="${broken}"/><path/></svg>`))
+      .toBe('<svg><g id="Монета &amp; &quot;Кошелёк&quot;"/><path/></svg>');
+  });
   it("uses vector export settings and verifies the SVG by importing it, then removes the temporary node", async () => {
     const { source, imported, createNodeFromSvg, currentPage } = environment();
     const result = await exportSelectedComposition([]);
