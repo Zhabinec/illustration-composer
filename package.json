@@ -3,13 +3,20 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm run build -w @illustration-composer/core && npm run build -w @illustration-composer/figma-plugin",
+    "typecheck": "npm run build -w @illustration-composer/core && npm run typecheck --workspaces",
+    "test": "npm run build -w @illustration-composer/core && npm run test --workspaces",
+    "check": "npm run build && npm run typecheck --workspaces && npm run test --workspaces",
+    "package": "npm run build && node scripts/package-plugin.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "private": true,
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"

@@ -1,4 +1,6 @@
 node_modules/
+/.verification/
+/artifacts/
 dist/
 .env
 .env.*

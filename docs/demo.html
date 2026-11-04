@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Illustration Composer — демонстрация</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#f4f5f8;color:#20222a;font:16px/1.5 system-ui,sans-serif}
+  main{max-width:1080px;margin:40px auto;padding:0 24px}h1{font-size:30px;margin:0 0 8px}p{margin:8px 0 20px}
+  .muted{color:#606575}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0}button,a{font:inherit}
+  button{padding:10px 16px;cursor:pointer;border:1px solid #cbd0dc;border-radius:10px;background:white;color:inherit}
+  button[aria-pressed=true]{background:#1261cc;color:white;border-color:#1261cc}button:focus-visible,a:focus-visible{outline:3px solid #1261cc;outline-offset:3px}
+  article{display:grid;grid-template-columns:320px 1fr;background:white;border:1px solid #e0e3eb;border-radius:16px;overflow:hidden}
+  section{padding:28px}h2{font-size:20px;margin:0 0 20px}dl{margin:0}dt{font-size:13px;color:#606575;margin-top:16px}dd{margin:3px 0 0}
+  figure{margin:0;padding:24px;background:#e9ecf2;display:grid;place-items:center;min-height:460px}img{display:block;width:100%;height:460px;object-fit:contain}
+  ol{padding-left:24px}li{padding:8px;border-radius:6px}li[aria-current=step]{background:#e8f1ff;color:#164f9b;font-weight:600}
+  a{color:#1261cc}.footer{font-size:13px;margin-top:20px}@media(max-width:720px){article{grid-template-columns:1fr}figure{min-height:300px}img{height:340px}main{margin:24px auto}}
+</style>
+<main>
+  <h1>Illustration Composer</h1>
+  <p class="muted">Figma-плагин собирает иллюстрации из исходных редактируемых векторов.</p>
+  <div class="controls" aria-label="Сценарии задания">
+    <button id="title-mode" aria-pressed="true">1. По заголовку</button>
+    <button id="names-mode" aria-pressed="false">2. По названиям</button>
+    <button id="play">Показать шаги</button>
+  </div>
+  <article>
+    <section>
+      <h2 id="heading">Финансовая безопасность</h2>
+      <dl><dt>Ввод пользователя</dt><dd id="input"></dd><dt>Предметы библиотеки</dt><dd id="objects"></dd><dt>Холст и цвета</dt><dd id="settings"></dd></dl>
+      <ol id="steps" aria-live="polite"></ol>
+      <a id="download" download>Скачать реальный SVG</a>
+    </section>
+    <figure><img id="result" alt="Сохранённая векторная композиция"></figure>
+  </article>
+  <p class="muted footer">Здесь показаны сохранённые результаты и последовательность действий, проверенные в Figma. Это демонстрация, не браузерная версия плагина. Запуск: npm ci → npm run build → импорт manifest.json в Figma Desktop. <a href="../README.md">Инструкция</a></p>
+</main>
+<script>
+const examples = [
+  { heading:'Финансовая безопасность', input:'Финансовая безопасность', objects:'Монета с замком + кошелёк', settings:'1200 × 800 · лазурная палитра из JSON', image:'examples/finance-azure.svg',
+    steps:['Ввести заголовок и нажать «Создать композицию».','Плагин выбирает существующие предметы и размещает их.','Скачать SVG: в файле остаются векторные пути и группы.'] },
+  { heading:'Телефон на книге', input:'Телефон, книга', objects:'Телефон + открытая книга', settings:'800 × 1200 · исходная палитра', image:'examples/phone-on-book-portrait.svg',
+    steps:['Выбрать «По названиям предметов» и ввести состав.','Создать сцену: телефон размещается на странице книги.','Редактировать предметы и скачать векторную композицию.'] }
+];
+let selected = 0, timer;
+const byId = id => document.getElementById(id);
+function show(index) {
+  clearInterval(timer); byId('play').textContent='Показать шаги'; selected=index;
+  const example=examples[index];
+  for(const key of ['heading','input','objects','settings']) byId(key).textContent=example[key];
+  byId('result').src=example.image; byId('result').alt=example.heading; byId('download').href=example.image;
+  byId('title-mode').setAttribute('aria-pressed',String(index===0)); byId('names-mode').setAttribute('aria-pressed',String(index===1));
+  byId('steps').replaceChildren(...example.steps.map(text=>{const li=document.createElement('li');li.textContent=text;return li;}));
+}
+byId('title-mode').onclick=()=>show(0); byId('names-mode').onclick=()=>show(1);
+byId('play').onclick=()=>{
+  show(selected); let step=0; const items=Array.from(byId('steps').children); byId('play').textContent='Повторить';
+  const advance=()=>{items.forEach((item,index)=>index===step?item.setAttribute('aria-current','step'):item.removeAttribute('aria-current'));step++;if(step===items.length)clearInterval(timer);};
+  advance();timer=setInterval(advance,2200);
+};
+show(0);
+</script>
+</html>
