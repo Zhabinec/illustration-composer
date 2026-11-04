@@ -1,243 +1,436 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <style>
-    body {
-      margin: 0;
-      padding: 20px;
-      font: 13px Inter, sans-serif;
-      color: var(--figma-color-text, #222);
-      background: var(--figma-color-bg, #fff);
-    }
-
-    h2 {
-      margin: 0 0 20px;
-      font-size: 16px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 6px;
-    }
-
-    select {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 16px;
-      border: 1px solid var(--figma-color-border, #ddd);
-      border-radius: 6px;
-      background: var(--figma-color-bg, #fff);
-      color: inherit;
-    }
-
-    input[type="file"] {
-      width: 100%;
-      margin-bottom: 16px;
-      color: inherit;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      border: 0;
-      border-radius: 6px;
-      background: var(--figma-color-bg-brand, #0d99ff);
-      color: var(--figma-color-text-onbrand, #fff);
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: default;
-    }
-
-    #status {
-      margin-top: 14px;
-      color: var(--figma-color-text-secondary, #777);
-    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; font: 13px Inter, sans-serif; color: var(--figma-color-text, #222); background: var(--figma-color-bg, #fff); }
+    h2 { font-size: 16px; margin: 0 0 14px; }
+    h3 { font-size: 13px; margin: 18px 0 10px; }
+    label { display: block; margin: 10px 0 5px; }
+    input, select, button { font: inherit; }
+    input:not([type="checkbox"]), select { width: 100%; padding: 8px; border: 1px solid var(--figma-color-border, #ccc); border-radius: 6px; background: var(--figma-color-bg, #fff); color: inherit; }
+    input[type="file"] { padding: 5px 0; }
+    button { padding: 9px 12px; border: 1px solid var(--figma-color-border, #ccc); border-radius: 6px; background: var(--figma-color-bg-secondary, #f3f3f3); color: inherit; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: default; }
+    button.primary { color: var(--figma-color-text-onbrand, white); background: var(--figma-color-bg-brand, #0d99ff); border-color: transparent; }
+    button.danger { color: var(--figma-color-text-danger, #b42318); }
+    .tabs, .inline { display: flex; gap: 8px; }
+    .tabs { margin-bottom: 12px; }
+    .tabs button { flex: 1; }
+    .tabs button.current { border-color: var(--figma-color-border-brand-strong, #0d99ff); }
+    .inline > * { flex: 1; min-width: 0; }
+    .muted { color: var(--figma-color-text-secondary, #777); font-size: 12px; }
+    .panel { border: 1px solid var(--figma-color-border, #ddd); border-radius: 8px; padding: 12px; margin: 12px 0; }
+    .preview { display: block; width: 140px; height: 116px; object-fit: contain; margin: 9px auto; background: var(--figma-color-bg-secondary, #fafafa); border-radius: 6px; }
+    .compare { display: flex; gap: 10px; }
+    .compare > div { flex: 1; text-align: center; min-width: 0; }
+    .compare img { width: 100%; height: 112px; object-fit: contain; background: var(--figma-color-bg-secondary, #fafafa); }
+    #status { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--figma-color-border, #ddd); color: var(--figma-color-text-secondary, #666); }
+    .variant { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--figma-color-border, #ddd); }
+    .variant button { font-size: 11px; padding: 6px; }
+    .swatch-option { display: flex; gap: 8px; }
+    [hidden] { display: none !important; }
   </style>
 </head>
 <body>
   <h2>Illustration Composer</h2>
+  <div class="tabs">
+    <button id="tab-compose" class="current">Композиция</button>
+    <button id="tab-library">Библиотека</button>
+  </div>
 
-  <label for="primary">Основной объект</label>
-  <select id="primary"></select>
+  <section id="compose">
+    <label for="primary">Основной объект</label>
+    <select id="primary"></select>
+    <label for="secondary">Дополнительный объект</label>
+    <select id="secondary"></select>
+    <div class="inline">
+      <div>
+        <label for="size">Детализация</label>
+        <select id="size"><option value="L">L</option><option value="S">S</option></select>
+      </div>
+      <div>
+        <label for="secondary-role">Роль второго</label>
+        <select id="secondary-role">
+          <option value="main">Главный</option>
+          <option value="background">Фоновый</option>
+        </select>
+      </div>
+    </div>
+    <div class="inline">
+      <div>
+        <label for="layout">Композиция</label>
+        <select id="layout">
+          <option value="focus">Focus — акцент</option>
+          <option value="row">Row — в ряд</option>
+        </select>
+      </div>
+      <div>
+        <label for="format">Формат</label>
+        <select id="format">
+          <option value="landscape">1200 × 800</option>
+          <option value="square">1000 × 1000</option>
+          <option value="portrait">800 × 1200</option>
+        </select>
+      </div>
+    </div>
+    <label for="palette">Палитра</label>
+    <select id="palette"></select>
+    <label for="palette-file">Своя палитра (JSON)</label>
+    <input type="file" id="palette-file" accept=".json,application/json">
+    <button id="create" class="primary" style="width:100%;margin-top:12px" disabled>Создать композицию</button>
+  </section>
 
-  <label for="secondary">Дополнительный объект</label>
-  <select id="secondary"></select>
+  <section id="library" hidden>
+    <div class="inline">
+      <button id="refresh">Обновить список</button>
+      <button id="select-current">Добавить выделенное в Figma</button>
+    </div>
+    <label for="candidate">Незарегистрированные ресурсы</label>
+    <select id="candidate"></select>
+    <div class="muted" id="candidate-count"></div>
+    <img class="preview" id="candidate-preview" alt="Предпросмотр ресурса" hidden>
 
-  <label for="layout">Тип композиции</label>
-  <select id="layout">
-    <option value="focus">Focus — с акцентом</option>
-    <option value="row">Row — в ряд</option>
-  </select>
+    <div id="registration" class="panel" hidden>
+      <label for="kind">Что это за ресурс?</label>
+      <select id="kind">
+        <option value="existing">Вариант существующего объекта</option>
+        <option value="new">Новый объект</option>
+        <option value="palette">Цветовая палитра</option>
+      </select>
+      <div id="existing-fields">
+        <label for="existing-asset">Добавить к объекту</label>
+        <select id="existing-asset"></select>
+      </div>
+      <div id="name-fields" hidden>
+        <label for="resource-name">Название</label>
+        <input id="resource-name" placeholder="Например: Куст">
+      </div>
+      <div id="variant-fields" class="inline">
+        <div>
+          <label for="variant-size">Размер</label>
+          <select id="variant-size"><option value="L">L</option><option value="S">S</option></select>
+        </div>
+        <div>
+          <label for="variant-role">Роль</label>
+          <select id="variant-role">
+            <option value="main">Главный</option>
+            <option value="background">Фоновый</option>
+          </select>
+        </div>
+      </div>
+      <div id="palette-fields" hidden>
+        <p class="muted">Назначь цвета из найденного ресурса. Тёмный, средний и светлый обязательны.</p>
+        <div id="color-roles"></div>
+      </div>
+      <button id="register" class="primary" style="width:100%;margin-top:12px">Зарегистрировать</button>
+    </div>
 
-  <label for="format">Формат холста</label>
-  <select id="format">
-    <option value="landscape">Горизонтальный — 1200 × 800</option>
-    <option value="square">Квадратный — 1000 × 1000</option>
-    <option value="portrait">Вертикальный — 800 × 1200</option>
-  </select>
+    <div id="conflict" class="panel" hidden>
+      <strong>Этот вариант уже существует</strong>
+      <p class="muted">Сравни текущий и новый объекты. Ничего не будет перезаписано без подтверждения.</p>
+      <div class="compare">
+        <div><span class="muted">Текущий</span><img id="old-preview" alt="Текущий вариант"></div>
+        <div><span class="muted">Новый</span><img id="new-preview" alt="Новый вариант"></div>
+      </div>
+      <p><button id="alternative" style="width:100%">Сохранить как альтернативу</button></p>
+      <label><input type="checkbox" id="confirm-replace"> Понимаю, что активным станет новый вариант</label>
+      <button id="replace" class="danger" style="width:100%" disabled>Подтвердить замену</button>
+      <p><button id="cancel-conflict" style="width:100%">Отмена</button></p>
+    </div>
 
-  <label for="palette">Цветовая палитра</label>
-  <select id="palette">
-    <option value="original">Фиолетовая</option>
-    <option value="mint">Мятная</option>
-    <option value="peach">Персиковая</option>
-  </select>
+    <h3>Управление вариантами</h3>
+    <label for="manage-asset">Объект каталога</label>
+    <select id="manage-asset"></select>
+    <div class="panel" id="variant-list"></div>
+  </section>
 
-  <label for="palette-file">Загрузить свою палитру (JSON)</label>
-  <input
-    id="palette-file"
-    type="file"
-    accept=".json,application/json"
-  >
-
-  <button id="create" disabled>
-    Создать композицию
-  </button>
-
-  <p id="status">Загрузка каталога...</p>
+  <div id="status">Загрузка библиотеки…</div>
 
   <script>
-    const primary = document.getElementById("primary");
-    const secondary = document.getElementById("secondary");
-    const layout = document.getElementById("layout");
-    const format = document.getElementById("format");
-    const palette = document.getElementById("palette");
-    const paletteFile = document.getElementById("palette-file");
-    const button = document.getElementById("create");
-    const statusElement = document.getElementById("status");
+    const element = id => document.getElementById(id);
+    const ui = {
+      compose: element("compose"), library: element("library"),
+      primary: element("primary"), secondary: element("secondary"),
+      size: element("size"), secondaryRole: element("secondary-role"),
+      layout: element("layout"), format: element("format"),
+      palette: element("palette"), paletteFile: element("palette-file"),
+      create: element("create"), candidate: element("candidate"),
+      candidateCount: element("candidate-count"), candidatePreview: element("candidate-preview"),
+      registration: element("registration"), kind: element("kind"),
+      existingFields: element("existing-fields"), existingAsset: element("existing-asset"),
+      nameFields: element("name-fields"), resourceName: element("resource-name"),
+      variantFields: element("variant-fields"), variantSize: element("variant-size"),
+      variantRole: element("variant-role"), paletteFields: element("palette-fields"),
+      colorRoles: element("color-roles"), register: element("register"),
+      conflict: element("conflict"), oldPreview: element("old-preview"),
+      newPreview: element("new-preview"), confirmReplace: element("confirm-replace"),
+      replace: element("replace"), manageAsset: element("manage-asset"),
+      variantList: element("variant-list"), status: element("status")
+    };
 
+    const roleNames = {
+      dark: "Тёмный", medium: "Средний", light: "Светлый",
+      pale: "Очень светлый", pink: "Розовый", pinkLight: "Светло-розовый", yellow: "Жёлтый"
+    };
+    let assets = [];
+    let candidates = [];
+    let detectedColors = [];
     let customPalette = null;
+    let pendingConflict = null;
 
-    function fillSelect(select, assets) {
+    function send(message) {
+      parent.postMessage({ pluginMessage: message }, "*");
+    }
+
+    function fillSelect(select, options, preserve = true) {
+      const previous = preserve ? select.value : "";
       select.replaceChildren();
-
-      for (const asset of assets) {
+      for (const entry of options) {
         const option = document.createElement("option");
-
-        option.value = asset.id;
-        option.textContent = asset.name;
-
+        option.value = entry.value;
+        option.textContent = entry.label;
         select.appendChild(option);
+      }
+      if (previous && options.some(item => item.value === previous)) select.value = previous;
+    }
+
+    function displayTab(library) {
+      ui.compose.hidden = library;
+      ui.library.hidden = !library;
+      element("tab-compose").classList.toggle("current", !library);
+      element("tab-library").classList.toggle("current", library);
+    }
+    element("tab-compose").onclick = () => displayTab(false);
+    element("tab-library").onclick = () => displayTab(true);
+
+    function selectCandidate() {
+      const candidate = candidates.find(item => item.nodeId === ui.candidate.value);
+      ui.registration.hidden = !candidate;
+      ui.conflict.hidden = true;
+      pendingConflict = null;
+      ui.candidatePreview.hidden = true;
+      if (!candidate) return;
+      ui.variantSize.value = candidate.size;
+      ui.variantRole.value = candidate.role;
+      ui.resourceName.value = /^Group(?:\s|$)/i.test(candidate.name) ? "" : candidate.name;
+      send({ type: "preview", nodeId: candidate.nodeId });
+      if (ui.kind.value === "palette") inspectPalette();
+    }
+
+    function inspectPalette() {
+      detectedColors = [];
+      ui.colorRoles.replaceChildren();
+      if (ui.candidate.value) send({ type: "inspect-palette", nodeId: ui.candidate.value });
+    }
+
+    function renderColorRoles() {
+      ui.colorRoles.replaceChildren();
+      for (const [role, label] of Object.entries(roleNames)) {
+        const wrapper = document.createElement("div");
+        const caption = document.createElement("label");
+        caption.textContent = `${label}${["dark", "medium", "light"].includes(role) ? " *" : ""}`;
+        const select = document.createElement("select");
+        select.dataset.role = role;
+        fillSelect(select, [
+          { value: "", label: "— не назначен —" },
+          ...detectedColors.map(color => ({ value: color, label: color }))
+        ], false);
+        wrapper.append(caption, select);
+        ui.colorRoles.appendChild(wrapper);
       }
     }
 
-    paletteFile.onchange = async () => {
-      const file = paletteFile.files[0];
+    function updateKind() {
+      const kind = ui.kind.value;
+      ui.existingFields.hidden = kind !== "existing";
+      ui.nameFields.hidden = kind === "existing";
+      ui.variantFields.hidden = kind === "palette";
+      ui.paletteFields.hidden = kind !== "palette";
+      ui.register.textContent = kind === "palette" ? "Добавить палитру" : "Зарегистрировать объект";
+      if (kind === "palette") inspectPalette();
+    }
+    ui.kind.onchange = updateKind;
+    ui.candidate.onchange = selectCandidate;
 
-      if (!file) {
-        return;
+    function renderVariants() {
+      const asset = assets.find(item => item.id === ui.manageAsset.value);
+      ui.variantList.replaceChildren();
+      if (!asset) return;
+      for (const variant of asset.variants) {
+        const line = document.createElement("div");
+        line.className = "variant";
+        const name = document.createElement("span");
+        name.textContent = `${variant.size}/${variant.role}${variant.active ? " · активный" : " · сохранён"}`;
+        line.appendChild(name);
+        if (!variant.active) {
+          const current = asset.variants.find(other => other.active && other.size === variant.size && other.role === variant.role);
+          if (current) {
+            const button = document.createElement("button");
+            button.textContent = "Активировать";
+            button.onclick = () => {
+              if (button.dataset.confirm !== "yes") {
+                button.dataset.confirm = "yes";
+                button.textContent = "Подтвердить";
+                return;
+              }
+              send({ type: "activate", assetId: asset.id, variantId: variant.id, expectedActiveId: current.id });
+              button.disabled = true;
+            };
+            line.appendChild(button);
+          }
+        }
+        ui.variantList.appendChild(line);
       }
+    }
+    ui.manageAsset.onchange = renderVariants;
 
-      try {
-        if (file.size > 16384) {
-          throw new Error("Файл палитры слишком большой");
-        }
-
-        const data = JSON.parse(await file.text());
-
-        if (
-          !data ||
-          typeof data !== "object" ||
-          Array.isArray(data) ||
-          typeof data.name !== "string" ||
-          !data.name.trim()
-        ) {
-          throw new Error("Некорректный файл палитры");
-        }
-
-        const previousOption = palette.querySelector(
-          'option[value="custom"]'
-        );
-
-        if (previousOption) {
-          previousOption.remove();
-        }
-
+    function updateReady(message) {
+      assets = message.assets;
+      candidates = message.candidates;
+      fillSelect(ui.primary, assets.filter(asset => asset.variants.some(item => item.active && item.role === "main"))
+        .map(asset => ({ value: asset.id, label: asset.name })));
+      fillSelect(ui.secondary, assets.map(asset => ({ value: asset.id, label: asset.name })));
+      if (!ui.primary.value && assets.some(item => item.id === "wallet")) ui.primary.value = "wallet";
+      if (!ui.secondary.value && assets.some(item => item.id === "coin")) ui.secondary.value = "coin";
+      ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+      fillSelect(ui.palette, message.palettes.map(item => ({ value: item.id, label: item.name })));
+      if (customPalette && ![...ui.palette.options].some(item => item.value === "custom")) {
         const option = document.createElement("option");
         option.value = "custom";
-        option.textContent = data.name;
+        option.textContent = customPalette.name;
+        ui.palette.appendChild(option);
+      }
+      fillSelect(ui.existingAsset, assets.map(asset => ({ value: asset.id, label: asset.name })));
+      fillSelect(ui.manageAsset, assets.map(asset => ({ value: asset.id, label: asset.name })));
+      fillSelect(ui.candidate, candidates.map(item => ({
+        value: item.nodeId, label: `${item.name} · ${item.size}/${item.role} (${item.nodeId})`
+      })));
+      ui.candidateCount.textContent = `Ожидают регистрации: ${candidates.length}`;
+      renderVariants();
+      selectCandidate();
+      ui.status.textContent = `Каталог: ${assets.length} объектов, ${message.palettes.length} палитр`;
+      ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+    }
 
-        palette.appendChild(option);
-
+    ui.paletteFile.onchange = async () => {
+      const file = ui.paletteFile.files[0];
+      if (!file) return;
+      try {
+        if (file.size > 16384) throw new Error("Слишком большой файл палитры");
+        const data = JSON.parse(await file.text());
+        if (!data || typeof data !== "object" || typeof data.name !== "string") {
+          throw new Error("Неверный формат палитры");
+        }
         customPalette = data;
-        palette.value = "custom";
-
-        statusElement.textContent = "Палитра загружена";
+        const exists = [...ui.palette.options].some(item => item.value === "custom");
+        if (!exists) {
+          const option = document.createElement("option");
+          option.value = "custom";
+          ui.palette.appendChild(option);
+        }
+        ui.palette.querySelector('option[value="custom"]').textContent = data.name;
+        ui.palette.value = "custom";
+        ui.status.textContent = "Пользовательская палитра загружена";
       } catch (error) {
         customPalette = null;
-        palette.value = "original";
-
-        statusElement.textContent = error instanceof Error
-          ? error.message
-          : String(error);
+        ui.status.textContent = error.message;
       }
     };
 
-    button.onclick = () => {
-      if (!primary.value || !secondary.value) {
-        return;
-      }
+    ui.create.onclick = () => {
+      ui.create.disabled = true;
+      ui.status.textContent = "Создаём композицию…";
+      send({
+        type: "create", primaryId: ui.primary.value, secondaryId: ui.secondary.value,
+        size: ui.size.value, secondaryRole: ui.secondaryRole.value,
+        layout: ui.layout.value, format: ui.format.value,
+        palette: ui.palette.value === "custom" ? customPalette : ui.palette.value
+      });
+    };
 
-      button.disabled = true;
-      statusElement.textContent = "Создаём композицию...";
-
-      parent.postMessage({
-        pluginMessage: {
-          type: "create",
-          primaryId: primary.value,
-          secondaryId: secondary.value,
-          layout: layout.value,
-          format: format.value,
-          palette: palette.value === "custom"
-            ? customPalette
-            : palette.value
+    ui.register.onclick = () => {
+      if (!ui.candidate.value) return;
+      const kind = ui.kind.value;
+      const message = {
+        type: "register", kind, nodeId: ui.candidate.value,
+        assetId: ui.existingAsset.value, name: ui.resourceName.value,
+        size: ui.variantSize.value, role: ui.variantRole.value
+      };
+      if (kind === "palette") {
+        const colors = {};
+        for (const select of ui.colorRoles.querySelectorAll("select")) {
+          if (select.value) colors[select.dataset.role] = select.value;
         }
-      }, "*");
+        message.colors = colors;
+      }
+      ui.status.textContent = "Сохраняем ресурс…";
+      send(message);
+    };
+
+    element("refresh").onclick = () => send({ type: "refresh" });
+    element("select-current").onclick = () => send({ type: "select-current" });
+    ui.confirmReplace.onchange = () => {
+      ui.replace.disabled = !ui.confirmReplace.checked;
+    };
+    element("alternative").onclick = () => {
+      if (pendingConflict !== null) send({ type: "confirm-register", token: pendingConflict, decision: "alternative" });
+    };
+    ui.replace.onclick = () => {
+      if (pendingConflict !== null && ui.confirmReplace.checked) {
+        send({ type: "confirm-register", token: pendingConflict, decision: "replace" });
+      }
+    };
+    element("cancel-conflict").onclick = () => {
+      pendingConflict = null;
+      ui.conflict.hidden = true;
+      ui.registration.hidden = false;
+      ui.status.textContent = "Регистрация отменена";
     };
 
     window.onmessage = event => {
       const message = event.data.pluginMessage;
-
-      if (!message) {
-        return;
-      }
-
-      if (message.type === "ready") {
-        fillSelect(primary, message.assets);
-        fillSelect(secondary, message.assets);
-
-        primary.value = "wallet";
-        secondary.value = "coin";
-
-        if (!primary.value) {
-          primary.selectedIndex = 0;
-        }
-
-        if (!secondary.value) {
-          secondary.selectedIndex = 0;
-        }
-
-        button.disabled = !primary.value || !secondary.value;
-
-        statusElement.textContent =
-          `Доступно объектов: ${message.assets.length}`;
-      }
-
-      if (message.type === "created") {
-        button.disabled = false;
-        statusElement.textContent = "Композиция создана";
-      }
-
-      if (message.type === "error") {
-        button.disabled = false;
-        statusElement.textContent = message.message;
+      if (!message) return;
+      switch (message.type) {
+        case "ready": updateReady(message); break;
+        case "selected":
+          ui.candidate.value = message.nodeId;
+          selectCandidate();
+          break;
+        case "preview":
+          if (message.nodeId === ui.candidate.value && message.image) {
+            ui.candidatePreview.src = message.image;
+            ui.candidatePreview.hidden = false;
+          }
+          break;
+        case "palette-colors":
+          if (message.nodeId === ui.candidate.value) {
+            detectedColors = message.colors;
+            renderColorRoles();
+          }
+          break;
+        case "conflict":
+          pendingConflict = message.token;
+          ui.conflict.hidden = false;
+          ui.registration.hidden = true;
+          ui.oldPreview.src = message.currentPreview || "";
+          ui.newPreview.src = message.incomingPreview || "";
+          ui.confirmReplace.checked = false;
+          ui.replace.disabled = true;
+          ui.status.textContent = "Нужен выбор: сохранить альтернативу или заменить текущий вариант";
+          break;
+        case "created":
+          ui.create.disabled = false;
+          ui.status.textContent = "Композиция создана";
+          break;
+        case "error":
+          ui.create.disabled = !ui.primary.value || !ui.secondary.value;
+          ui.status.textContent = message.message;
+          break;
       }
     };
+    updateKind();
   </script>
 </body>
 </html>
