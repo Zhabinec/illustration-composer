@@ -1,6 +1,7 @@
 
 import type { AssetId } from "../catalog/asset-id.js";
 import type { AssetVariant } from "../catalog/asset.js";
+import type { ColorRole } from "../palette/color-palette.js";
 
 export interface CompositionSource {
   assetId: AssetId;
@@ -23,6 +24,7 @@ export interface CompositionScene {
   width: number;
   height: number;
   items: readonly CompositionItem[];
+  background?: ColorRole;
   shrinkSuggestions?: readonly { assetId: AssetId; scale: number }[];
 }
 

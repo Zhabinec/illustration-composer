@@ -3,6 +3,7 @@ import {
   LibraryRegistry,
   VariantId,
   createFocusComposition,
+  createAutomaticComposition,
   createRowComposition,
   findAssetVariant,
   palettePresets,
@@ -479,7 +480,7 @@ async function main(): Promise<void> {
 
       const layout = stringField(message, "layout");
 
-      if (layout !== "focus" && layout !== "row") {
+      if (layout !== "focus" && layout !== "row" && layout !== "automatic") {
         throw new Error("Invalid layout");
       }
 
@@ -572,7 +573,9 @@ async function main(): Promise<void> {
         throw new Error("Укажи хотя бы один предмет.");
       }
 
-      const scene = layout === "row"
+      const scene = layout === "automatic"
+        ? createAutomaticComposition(canvas.width, canvas.height, sources)
+        : layout === "row"
         ? createRowComposition(
             canvas.width,
             canvas.height,
@@ -602,7 +605,7 @@ async function main(): Promise<void> {
 
       const frame = await renderer.render(
         scene,
-        `${layout === "row" ? "Row" : "Focus"} - ${names.join(" + ")} - ${canvas.width}x${canvas.height}`,
+        `${layout === "automatic" ? "Auto" : layout === "row" ? "Row" : "Focus"} - ${names.join(" + ")} - ${canvas.width}x${canvas.height}`,
         palette
       );
 
