@@ -116,6 +116,7 @@
         <details>
           <summary>Заменить предмет</summary>
           <label for="scene-replace-asset">Новое изображение из библиотеки</label><select id="scene-replace-asset"></select>
+          <label for="scene-replace-role">Роль предмета</label><select id="scene-replace-role"></select>
           <label for="scene-replace-size">Детализация</label><select id="scene-replace-size"></select>
           <p id="scene-replace-help" class="muted"></p>
           <button id="scene-replace" style="width:100%">Заменить выбранный предмет</button>
@@ -526,24 +527,35 @@
           ["scene-object-width", item?.width], ["scene-object-height", item?.height]]) {
         element(field).value = value === undefined ? "" : Math.round(value * 100) / 100;
       }
-      element("scene-replace-asset").value = "";
-      updateReplacementVariants();
+      const currentName = item?.name.replace(/(?: — копия)+$/, "").trim().toLowerCase();
+      element("scene-replace-asset").value = assets.find(asset => asset.name.trim().toLowerCase() === currentName)?.id ?? "";
+      updateReplacementVariants(item?.role);
     }
-    function updateReplacementVariants() {
+    function updateReplacementVariants(preferredRole = element("scene-replace-role").value) {
       const item = editingScene?.items.find(item => item.id === element("scene-object").value);
       const asset = assets.find(asset => asset.id === element("scene-replace-asset").value);
-      const variants = asset?.variants.filter(variant => variant.active && variant.role === item?.role) ?? [];
+      const active = asset?.variants.filter(variant => variant.active) ?? [];
+      const roleSelect = element("scene-replace-role");
+      const roles = [
+        { value: "main", label: "Основной" }, { value: "background", label: "Фоновый" }
+      ].filter(role => active.some(variant => variant.role === role.value));
+      fillSelect(roleSelect, roles, false);
+      if (roles.some(role => role.value === preferredRole)) roleSelect.value = preferredRole;
+      roleSelect.disabled = !roles.length;
+      const variants = active.filter(variant => variant.role === roleSelect.value);
       fillSelect(element("scene-replace-size"), variants.map(variant => ({ value: variant.size,
         label: variant.size === "L" ? "Подробный" : "Упрощённый" })), false);
       if (variants.some(variant => variant.size === ui.size.value)) element("scene-replace-size").value = ui.size.value;
       element("scene-replace").disabled = !item || !variants.length;
-      element("scene-replace-help").textContent = asset && !variants.length
-        ? `У этого предмета нет ${item?.role === "background" ? "фонового" : "основного"} варианта. Выберите другой предмет.`
-        : "Центр, поворот, роль и слой сохраняются. Новый предмет впишется в текущий размер без растяжения.";
+      element("scene-replace-help").textContent = variants.length && roleSelect.value !== item?.role
+        ? (roleSelect.value === "background" ? "Фоновый вариант переместится под основные предметы." : "Основной вариант переместится над фоновыми предметами.")
+        : "Новый рисунок впишется в текущий размер без растяжения.";
     }
-    element("scene-replace-asset").onchange = updateReplacementVariants;
+    element("scene-replace-asset").onchange = () => updateReplacementVariants();
+    element("scene-replace-role").onchange = () => updateReplacementVariants();
     element("scene-replace").onclick = () => sceneCommand("scene-replace", {
-      assetId: element("scene-replace-asset").value, size: element("scene-replace-size").value
+      assetId: element("scene-replace-asset").value, size: element("scene-replace-size").value,
+      role: element("scene-replace-role").value
     });
     element("scene-object-width").oninput = () => {
       const item = editingScene?.items.find(item => item.id === element("scene-object").value);

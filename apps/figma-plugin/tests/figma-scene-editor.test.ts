@@ -235,12 +235,17 @@ describe("replacing and resizing an individual object", () => {
     expect(postMessage.mock.lastCall![0].scene.items[0].width).toBe(300);
     expect(postMessage.mock.lastCall![0].scene.items[0].height).toBe(150);
   });
-  it.each(["L", "S"])("resolves a replacement against the current catalog for requested size %s", async size => {
+  it.each([
+    ["main", "background", "L"],
+    ["background", "main", "L"],
+    ["main", "background", "S"]
+  ] as const)("switches %s to %s using the requested size %s", async (previousRole, role, size) => {
     const registry = new LibraryRegistry();
     registry.createAsset(AssetId.create("wallet"), "Кошелёк", {
-      id: VariantId.create("wallet-main"), size: "L", role: "main", resourceKey: "wallet-resource"
+      id: VariantId.create("wallet-variant"), size: "L", role, resourceKey: "wallet-resource"
     });
-    const old = object("phone"), copy = object("wallet-copy"), frame = canvas([old]);
+    const old = object("phone", previousRole), copy = object("wallet-copy"), peer = object("coin", previousRole);
+    const frame = canvas(role === "background" ? [peer, old] : [old, peer]);
     const source = object("library-wallet");
     source.clone.mockReturnValue(copy);
     old.remove.mockImplementation(() => frame.children.splice(frame.children.indexOf(old), 1));
@@ -248,7 +253,7 @@ describe("replacing and resizing an individual object", () => {
     vi.stubGlobal("figma", { currentPage: page, ui: { postMessage }, commitUndo: vi.fn(),
       getNodeByIdAsync: async (id: string) => id === frame.id ? frame : id === source.id ? source : null });
     const request = { type: "scene-replace", sceneId: frame.id, nodeId: old.id, assetId: "wallet", size,
-      role: "background", palette: "original" };
+      role, palette: "original" };
     const state = { version: 1 as const, registry: registry.snapshot(), sourceNodeIds: { "wallet-resource": source.id }, palettes: [] };
     if (size === "S") {
       await expect(handleSceneMessage(request, state)).rejects.toThrow(/нет выбранного варианта/);
@@ -257,10 +262,10 @@ describe("replacing and resizing an individual object", () => {
       return;
     }
     await handleSceneMessage(request, state);
-    expect(frame.children).toEqual([copy]);
+    expect(frame.children).toEqual(role === "background" ? [copy, peer] : [peer, copy]);
     expect(page.selection).toEqual([copy]);
     expect(copy.name).toBe("Кошелёк");
-    expect(copy.getSharedPluginData("illustrationComposer", "composition-role")).toBe("main");
+    expect(copy.getSharedPluginData("illustrationComposer", "composition-role")).toBe(role);
     expect(postMessage.mock.lastCall![0].scene.selectedId).toBe(copy.id);
     expect(source.name).toBe("library-wallet");
     expect(source.rescale).not.toHaveBeenCalled();

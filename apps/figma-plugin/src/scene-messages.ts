@@ -52,14 +52,16 @@ export async function handleSceneMessage(message: Record<string, unknown>, state
   } else if (message.type === "scene-add" || message.type === "scene-replace") {
     const replaced = message.type === "scene-replace" ? getSceneObject(scene, text(message, "nodeId")) : null;
     const asset = toAssetCatalog(new LibraryRegistry(state.registry)).getById(AssetId.create(text(message, "assetId")));
-    const role = replaced ? replaced.getSharedPluginData("illustrationComposer", "composition-role") === "background" ? "background" : "main"
-      : message.role === "background" ? "background" : message.role === "main" ? "main" : null;
+    const role = message.role === "background" || message.role === "main" ? message.role
+      : replaced && message.role === undefined
+        ? replaced.getSharedPluginData("illustrationComposer", "composition-role") === "background" ? "background" : "main"
+        : null;
     const size = message.size === "S" ? "S" : message.size === "L" ? "L" : null;
     if (!asset || !role || !size) throw new Error("Выберите существующий предмет и его вариант.");
     const variant = findAssetVariant(asset, size, role) ?? (replaced ? undefined : findAssetVariant(asset, size === "L" ? "S" : "L", role));
     if (!variant) throw new Error("У этого предмета нет выбранного варианта. Измените роль или предмет.");
     const adapter = new FigmaAssetAdapter(state.sourceNodeIds);
-    if (replaced) figma.currentPage.selection = [await replaceSceneObject(replaced, adapter, variant.resourceKey, asset.name, palette)];
+    if (replaced) figma.currentPage.selection = [await replaceSceneObject(replaced, adapter, variant.resourceKey, asset.name, palette, role)];
     else await addSceneObject(scene, adapter, variant.resourceKey, asset.name, role, palette);
   } else if (message.type === "scene-settings") {
     if (typeof message.width !== "number" || typeof message.height !== "number") throw new Error("Укажите размер холста.");

@@ -1,5 +1,5 @@
 import { fitCompositionTemplate } from "@illustration-composer/core";
-import type { ColorPalette } from "@illustration-composer/core";
+import type { AssetRole, ColorPalette } from "@illustration-composer/core";
 import type { EditableObject } from "./figma-scene-editor.js";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaPaletteAdapter } from "./figma-palette-adapter.js";
@@ -20,7 +20,8 @@ export function resizeSceneObject(node: EditableObject, width: number): void {
 }
 
 export async function replaceSceneObject(
-  node: EditableObject, adapter: FigmaAssetAdapter, resourceKey: string, name: string, palette: ColorPalette
+  node: EditableObject, adapter: FigmaAssetAdapter, resourceKey: string, name: string, palette: ColorPalette,
+  role?: AssetRole
 ): Promise<EditableObject> {
   const parent = node.parent;
   if (!parent || (parent.type !== "FRAME" && parent.type !== "GROUP")) {
@@ -37,10 +38,13 @@ export async function replaceSceneObject(
     copy.name = name;
     copy.locked = false;
     copy.visible = node.visible;
-    copy.setSharedPluginData("illustrationComposer", "composition-role",
-      node.getSharedPluginData("illustrationComposer", "composition-role") === "background" ? "background" : "main");
+    const previousRole = node.getSharedPluginData("illustrationComposer", "composition-role") === "background" ? "background" : "main";
+    const nextRole = role ?? previousRole;
+    copy.setSharedPluginData("illustrationComposer", "composition-role", nextRole);
     new FigmaPaletteAdapter().apply(copy, palette);
-    parent.insertChild(parent.children.indexOf(node), copy);
+    const index = nextRole === previousRole ? parent.children.indexOf(node)
+      : nextRole === "background" ? 0 : parent.children.length - 1;
+    parent.insertChild(index, copy);
     node.remove();
     return copy;
   } catch (error) { copy.remove(); throw error; }
