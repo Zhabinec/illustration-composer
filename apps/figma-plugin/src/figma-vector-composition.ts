@@ -17,7 +17,7 @@ export function assertVectorContent(node: SceneNode): void {
   const descendants = "findAll" in node ? node.findAll(() => true) : [];
   for (const item of [node, ...descendants]) {
     if (!allowed.has(item.type)) {
-      throw new Error(`Слой «${item.name}» (${item.type}) не поддерживается в векторном шаблоне.`);
+      throw new Error(`Слой «${item.name}» (${item.type}) не поддерживается как векторный объект.`);
     }
     const paints: Paint[] = [];
     if ("fills" in item && Array.isArray(item.fills)) paints.push(...item.fills);

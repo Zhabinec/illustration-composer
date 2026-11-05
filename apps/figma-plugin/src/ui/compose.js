@@ -1,6 +1,7 @@
 import { element, fillSelect } from "./dom.js";
 import { mountCompositionItems } from "./compose-items.js";
 import { mountCompositionDecoration } from "./compose-decoration.js";
+import { canvasFormats } from "../canvas-formats.js";
 
 export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette }) {
   const ui = { primary: element("primary"),
@@ -9,7 +10,12 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
     format: element("format"),
     palette: element("palette"),
     create: element("create") };
-  const dimensions = () => ({ landscape: [1200, 800], wide: [1200, 630], square: [1000, 1000], portrait: [800, 1200] }[ui.format.value]);
+  fillSelect(ui.format, Object.entries(canvasFormats).map(([value, { name, width, height }]) =>
+    ({ value, label: `${name} · ${width} × ${height}` })));
+  const dimensions = () => {
+    const { width, height } = canvasFormats[ui.format.value];
+    return [width, height];
+  };
   const items = mountCompositionItems(send, dimensions);
   let assets = [];
   let previewRequestId = 0;
