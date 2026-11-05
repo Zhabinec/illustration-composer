@@ -87,10 +87,10 @@ export async function addChosenDecoration(
     assertVectorContent(layer);
     const fit = decorationFit(scene, source);
     const [[a, c, x], [b, d, y]] = layer.relativeTransform;
-    const centerX = entry.x === undefined ? fit.offsetX + fit.scale * (x + a * layer.width / 2 + c * layer.height / 2)
-      : scene.width * coordinate(entry.x, 0, 100) / 100;
-    const centerY = entry.y === undefined ? fit.offsetY + fit.scale * (y + b * layer.width / 2 + d * layer.height / 2)
-      : scene.height * coordinate(entry.y, 0, 100) / 100;
+    const centerX = fit.offsetX + fit.scale * (x + a * layer.width / 2 + c * layer.height / 2);
+    const centerY = fit.offsetY + fit.scale * (y + b * layer.width / 2 + d * layer.height / 2);
+    const positionX = entry.x === undefined ? undefined : coordinate(entry.x, -10000, 10000);
+    const positionY = entry.y === undefined ? undefined : coordinate(entry.y, -10000, 10000);
     const scale = fit.scale * coordinate(entry.scale, 25, 250) / 100;
     const rotation = coordinate(entry.rotation, -180, 180);
     const copy = layer.clone();
@@ -101,8 +101,8 @@ export async function addChosenDecoration(
     copy.relativeTransform = [[a, c, 0], [b, d, 0]];
     copy.rotation += rotation;
     const [[ra, rc], [rb, rd]] = copy.relativeTransform;
-    copy.x = centerX - ra * copy.width / 2 - rc * copy.height / 2;
-    copy.y = centerY - rb * copy.width / 2 - rd * copy.height / 2;
+    copy.x = positionX ?? (centerX - ra * copy.width / 2 - rc * copy.height / 2);
+    copy.y = positionY ?? (centerY - rb * copy.width / 2 - rd * copy.height / 2);
     new FigmaPaletteAdapter().apply(copy, palette);
   }
 }

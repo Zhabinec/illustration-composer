@@ -491,7 +491,7 @@ async function main(): Promise<void> {
 
       const layout = stringField(message, "layout");
 
-      if (layout !== "focus" && layout !== "row" && layout !== "automatic" && layout !== "manual") {
+      if (!["focus", "row", "automatic", "manual", "left", "right"].includes(layout)) {
         throw new Error("Invalid layout");
       }
 
@@ -611,7 +611,7 @@ async function main(): Promise<void> {
         ? await planAutomaticScene(canvas.width, canvas.height, sources, paletteSourceNodeIds(state.palettes)) : null;
       const planned = automatic
         ? automatic.scene
-        : layout === "row"
+        : layout === "row" || layout === "left" || layout === "right"
         ? createRowComposition(
             canvas.width,
             canvas.height,
@@ -625,7 +625,10 @@ async function main(): Promise<void> {
             ...sources.slice(2)
           );
 
-      const scene = applyCompositionItemSettings(planned, sources, settings);
+      const positioned = layout === "right" ? { ...planned, items: planned.items.map((item, index) => ({
+        ...item, x: planned.width - item.x - sources[index]!.width * item.scale
+      })) } : planned;
+      const scene = applyCompositionItemSettings(positioned, sources, settings);
       if (!preview && layout !== "manual" && requestCompositionAdjustment(message,
         (scene.shrinkSuggestions ?? []).map(item => ({
           name: catalog.getById(item.assetId)?.name ?? item.assetId.value,
@@ -640,7 +643,8 @@ async function main(): Promise<void> {
 
       const frame = await renderer.render(
         scene,
-        `${automatic?.description ?? (layout === "row" ? "Row" : "Focus")} - ${names.join(" + ")} - ${canvas.width}x${canvas.height}`,
+        `${automatic?.description ?? ({ row: "В ряд", focus: "Акцент", left: "Главный слева",
+          right: "Главный справа", manual: "Ручная расстановка" } as Record<string, string>)[layout]} - ${names.join(" + ")} - ${canvas.width}x${canvas.height}`,
         palette, false
       );
 
@@ -917,17 +921,38 @@ async function main(): Promise<void> {
             const { templates } = await discoverExampleTemplates(paletteSourceNodeIds(state.palettes));
             const template = templates.find(item => item.sourceNodeId === message.referenceId);
             if (!template) throw new Error("Пример недоступен.");
-            const source = await figma.getNodeByIdAsync(template.sourceNodeId);
-            const decorations = source?.type === "FRAME" ? await Promise.all(referenceDecor(source).map(async (layer, index) => {
-              let image: string | null = null;
-              try {
-                const bytes = await layer.exportAsync({ format: "PNG", constraint: { type: "WIDTH", value: 160 } });
-                image = `data:image/png;base64,${figma.base64Encode(bytes)}`;
-              } catch { /* Some thin vectors have no raster preview. */ }
-              return { id: layer.id, name: layer.type === "LINE" ? `Линия ${index + 1}` : layer.name, image };
-            })) : [];
             figma.ui.postMessage({ type: "compose-reference-image", referenceId: template.sourceNodeId,
-              image: await thumbnail(template.sourceNodeId), decorations });
+              image: await thumbnail(template.sourceNodeId) });
+            break;
+          }
+          case "compose-decoration-catalog": {
+            const { templates } = await discoverExampleTemplates(paletteSourceNodeIds(state.palettes));
+            const decorations = [];
+            const counts = new Map<string, number>();
+            for (const template of templates) {
+              const source = await figma.getNodeByIdAsync(template.sourceNodeId);
+              if (source?.type !== "FRAME") continue;
+              for (const layer of referenceDecor(source)) {
+                const type = layer.type === "LINE" ? "Линии" : /конфетти|confetti/i.test(layer.name) ? "Конфетти" : "Украшения";
+                const number = (counts.get(type) ?? 0) + 1;
+                counts.set(type, number);
+                decorations.push({ id: layer.id, sourceId: source.id, type,
+                  name: `${layer.type === "LINE" ? "Линия" : layer.name} · ${number}` });
+              }
+            }
+            figma.ui.postMessage({ type: "compose-decoration-catalog", decorations });
+            break;
+          }
+          case "compose-decoration-preview": {
+            const source = typeof message.sourceId === "string" ? await figma.getNodeByIdAsync(message.sourceId) : null;
+            const layer = source?.type === "FRAME" && referenceDecor(source).find(item => item.id === message.layerId);
+            if (!layer) break;
+            let image: string | null = null;
+            try {
+              const bytes = await layer.exportAsync({ format: "PNG", constraint: { type: "WIDTH", value: 160 } });
+              image = `data:image/png;base64,${figma.base64Encode(bytes)}`;
+            } catch { /* A zero-height line may not have a raster preview. */ }
+            figma.ui.postMessage({ type: "compose-decoration-image", layerId: layer.id, image });
             break;
           }
         }

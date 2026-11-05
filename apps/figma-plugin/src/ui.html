@@ -196,6 +196,8 @@
           <option value="automatic">Подобрать автоматически</option>
           <option value="focus">Главный крупнее</option>
           <option value="row">Слева направо</option>
+          <option value="left">Главный слева</option>
+          <option value="right">Главный справа</option>
           <option value="manual">Поставить вручную</option>
         </select>
       </div>
@@ -229,11 +231,12 @@
     <div id="compose-example-panel" hidden>
       <label for="compose-reference">Авторский пример</label><select id="compose-reference"></select>
       <img id="compose-reference-image" class="preview" alt="Авторская композиция" hidden>
-      <div id="compose-decoration-choices" hidden>
-        <label>Украшение из примера<select id="compose-decoration-choice"></select></label>
-        <img id="compose-decoration-image" class="preview" alt="Выбранное украшение" hidden>
-        <button id="compose-decoration-add" disabled>Добавить декор</button>
-      </div>
+    </div>
+    <div id="compose-decoration-choices" hidden>
+      <label>Тип декора<select id="compose-decoration-type"><option value="">Загружаем декор…</option></select></label>
+      <label>Украшение<select id="compose-decoration-choice"></select></label>
+      <img id="compose-decoration-image" class="preview" alt="Выбранное украшение" hidden>
+      <button id="compose-decoration-add" disabled>Добавить декор</button>
     </div>
     <div id="compose-decoration-items" hidden></div>
     <h3>Оформление</h3>

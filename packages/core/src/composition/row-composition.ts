@@ -19,6 +19,7 @@ export interface CompositionItem {
   scale: number;
   rotation: number;
   zIndex?: number;
+  layerPriority?: number;
 }
 
 export interface CompositionScene {

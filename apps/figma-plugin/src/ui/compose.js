@@ -9,11 +9,13 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
     format: element("format"),
     palette: element("palette"),
     create: element("create") };
-  const items = mountCompositionItems(send);
+  const dimensions = () => ({ landscape: [1200, 800], square: [1000, 1000], portrait: [800, 1200] }[ui.format.value]);
+  const items = mountCompositionItems(send, dimensions);
   let assets = [];
   let previewRequestId = 0;
   let previewBusy = false;
   let referencesLoaded = false;
+  let decorCatalogLoaded = false;
   const previewButton = element("compose-preview");
   const previewImage = element("compose-preview-image");
   const reference = element("compose-reference");
@@ -23,7 +25,7 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
   const backgroundReference = element("compose-background-reference");
   const backgroundImage = element("compose-background-image");
   const decorationChoices = element("compose-decoration-choices");
-  const decorItems = mountCompositionDecoration(() => invalidatePreview());
+  const decorItems = mountCompositionDecoration(send, dimensions, () => invalidatePreview());
   let palettes = [];
 
   let compositionBusy = false;
@@ -129,10 +131,11 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
       choose: "Выберите украшение и нажмите «Добавить декор». Настройте каждый элемент отдельно.",
       none: "На холсте останутся только предметы и выбранная заливка."
     }[decoration];
-    examplePanel.hidden = decoration !== "reference" && decoration !== "choose";
+    examplePanel.hidden = decoration !== "reference";
     backgroundExample.hidden = background !== "reference";
     decorationChoices.hidden = decoration !== "choose";
     element("compose-decoration-items").hidden = decoration !== "choose";
+    if (decoration === "choose" && !decorCatalogLoaded) send({ type: "compose-decoration-catalog" });
     element("compose-color-label").hidden = background !== "custom";
     updateBackgroundSwatch();
     if (!examplePanel.hidden) {
@@ -156,7 +159,6 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
   element("compose-color").oninput = updateBackgroundSwatch;
   function previewReference() {
     referenceImage.hidden = true;
-    decorItems.load(reference.value, []);
     updateCreateButton();
     if (reference.value) send({ type: "compose-reference-preview", referenceId: reference.value });
   }
@@ -168,8 +170,8 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
   backgroundReference.onchange = previewBackgroundReference;
 
   element("scene-new").onclick = () => {
-    const dimensions = { landscape: [1200, 800], square: [1000, 1000], portrait: [800, 1200] }[ui.format.value];
-    send({ type: "scene-new", width: dimensions[0], height: dimensions[1], palette: ui.palette.value });
+    const [width, height] = dimensions();
+    send({ type: "scene-new", width, height, palette: ui.palette.value });
   };
 
   function request(type) {
@@ -179,7 +181,7 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
     const background = element("compose-background").value;
     const decoration = element("compose-decoration").value;
     if ((background === "reference" && !backgroundReference.value) ||
-      ((decoration === "reference" || decoration === "choose") && !reference.value)) {
+      (decoration === "reference" && !reference.value)) {
       loadReferences();
       setStatus("Выберите авторский пример для оформления.");
       return;
@@ -319,7 +321,13 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
           referenceImage.src = message.image;
           referenceImage.hidden = false;
         }
-        decorItems.load(message.referenceId, message.decorations);
+        break;
+      case "compose-decoration-catalog":
+        decorCatalogLoaded = true;
+        decorItems.load(message.decorations);
+        break;
+      case "compose-decoration-image":
+        decorItems.receiveThumbnail(message.layerId, message.image);
         break;
       case "composition-preview":
         if (message.requestId !== previewRequestId) break;

@@ -31,7 +31,9 @@ export class FigmaSceneRenderer {
       frame.x = maxX + 100;
       frame.y = 0;
 
+      const priority = (item: CompositionScene["items"][number]) => item.layerPriority ?? Number(item.variant.role === "main");
       const ordered = [...scene.items].sort((a, b) =>
+        priority(a) - priority(b) ||
         Number(a.variant.role === "main") - Number(b.variant.role === "main") ||
         (a.zIndex ?? 0) - (b.zIndex ?? 0));
       for (const item of ordered) {

@@ -1,29 +1,38 @@
 import { element, fillSelect } from "./dom.js";
-import { numberField } from "./compose-items.js";
+import { numberField, placementFields } from "./compose-items.js";
 
-export function mountCompositionDecoration(invalidatePreview) {
+export function mountCompositionDecoration(send, dimensions, invalidatePreview) {
   const root = element("compose-decoration-items");
   const choice = element("compose-decoration-choice");
+  const type = element("compose-decoration-type");
   const add = element("compose-decoration-add");
   const image = element("compose-decoration-image");
   const cards = [];
-  let sourceId = "";
   let choices = [];
 
-  function updateButton() {
+  function updateChoice() {
     add.disabled = !choice.value || cards.length >= 12;
-    const thumbnail = choices.find(entry => entry.id === choice.value)?.image;
+    const selected = choices.find(entry => entry.id === choice.value);
+    const thumbnail = selected?.image;
     image.hidden = !thumbnail;
     if (thumbnail) image.src = thumbnail;
+    else if (selected && selected.image === undefined) {
+      send({ type: "compose-decoration-preview", sourceId: selected.sourceId, layerId: selected.id });
+    }
   }
-  function load(referenceId, decorations) {
-    sourceId = referenceId;
+  function filterChoices() {
+    const filtered = choices.filter(item => item.type === type.value);
+    fillSelect(choice, [{ value: "", label: filtered.length ? "Выберите украшение" : "Декор недоступен" },
+      ...filtered.map(item => ({ value: item.id, label: item.name }))], false);
+    updateChoice();
+  }
+  function load(decorations) {
     choices = decorations;
-    fillSelect(choice, [{ value: "", label: choices.length ? "Выберите линию или украшение" : "Декора нет" },
-      ...choices.map(item => ({ value: item.id, label: item.name }))], false);
-    updateButton();
+    fillSelect(type, [...new Set(choices.map(item => item.type))].map(name => ({ value: name, label: name })));
+    filterChoices();
   }
-  choice.onchange = updateButton;
+  type.onchange = filterChoices;
+  choice.onchange = updateChoice;
   add.onclick = () => {
     const item = choices.find(entry => entry.id === choice.value);
     if (!item || cards.length >= 12) return;
@@ -37,29 +46,26 @@ export function mountCompositionDecoration(invalidatePreview) {
     thumbnail.alt = item.name;
     thumbnail.hidden = !item.image;
     if (item.image) thumbnail.src = item.image;
-    const x = numberField("Центр слева, %", "", 0, 100, "Как в примере");
-    const y = numberField("Центр сверху, %", "", 0, 100, "Как в примере");
+    const position = placementFields(dimensions, "Как в примере");
     const scale = numberField("Размер, %", "100", 25, 250);
     const rotation = numberField("Поворот, °", "0", -180, 180);
-    const position = document.createElement("div");
-    position.className = "inline";
-    position.append(x.label, y.label);
     const transform = document.createElement("div");
     transform.className = "inline";
     transform.append(scale.label, rotation.label);
     const remove = document.createElement("button");
     remove.textContent = "Убрать украшение";
-    const entry = { sourceId, layerId: item.id, x: x.input, y: y.input, scale: scale.input, rotation: rotation.input };
+    const entry = { sourceId: item.sourceId, layerId: item.id, thumbnail,
+      x: position.x, y: position.y, scale: scale.input, rotation: rotation.input };
     remove.onclick = () => {
       cards.splice(cards.indexOf(entry), 1);
       card.remove();
-      updateButton();
+      updateChoice();
       invalidatePreview();
     };
-    card.append(title, thumbnail, position, transform, remove);
+    card.append(title, thumbnail, position.label, position.row, transform, remove);
     root.appendChild(card);
     cards.push(entry);
-    updateButton();
+    updateChoice();
     invalidatePreview();
   };
   function read() {
@@ -71,5 +77,15 @@ export function mountCompositionDecoration(invalidatePreview) {
     }
     return decorations;
   }
-  return { load, read };
+  function receiveThumbnail(layerId, thumbnail) {
+    const item = choices.find(entry => entry.id === layerId);
+    if (item) item.image = thumbnail;
+    if (choice.value === layerId) updateChoice();
+    if (!thumbnail) return;
+    for (const entry of cards.filter(entry => entry.layerId === layerId)) {
+      entry.thumbnail.src = thumbnail;
+      entry.thumbnail.hidden = false;
+    }
+  }
+  return { load, read, receiveThumbnail };
 }

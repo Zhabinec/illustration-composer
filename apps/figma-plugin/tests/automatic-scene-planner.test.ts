@@ -78,7 +78,10 @@ describe("automatic relationship selection", () => {
 });
 
 describe("scene layer ordering", () => {
-  it("renders the support below the subject and all backgrounds below main", async () => {
+  it.each([
+    [undefined, ["lamp", "book", "wallet"]],
+    [2, ["book", "wallet", "lamp"]]
+  ] as const)("uses explicit layer priority %s ahead of the default layer order", async (layerPriority, expected) => {
     const sources = [source("wallet", 600, 400), source("book", 1400, 1000)];
     const clones: string[] = [];
     const frame = { id: "result", resize: vi.fn(), remove: vi.fn(), setSharedPluginData: vi.fn() };
@@ -90,8 +93,9 @@ describe("scene layer ordering", () => {
     await renderer.render({ width: 1000, height: 1000, items: [
       { assetId: sources[0]!.assetId, variant: sources[0]!.variant, x: 0, y: 0, scale: 1, rotation: 0, zIndex: 1 },
       { assetId: sources[1]!.assetId, variant: sources[1]!.variant, x: 0, y: 0, scale: 1, rotation: 0, zIndex: 0 },
-      { assetId: AssetId.create("lamp"), variant: { size: "L", role: "background", resourceKey: "lamp" }, x: 0, y: 0, scale: 1, rotation: 0, zIndex: 99 }
+      { assetId: AssetId.create("lamp"), variant: { size: "L", role: "background", resourceKey: "lamp" }, x: 0, y: 0, scale: 1, rotation: 0, zIndex: 99,
+        ...(layerPriority === undefined ? {} : { layerPriority }) }
     ] }, "Scene", palettePresets.original);
-    expect(clones).toEqual(["lamp", "book", "wallet"]);
+    expect(clones).toEqual(expected);
   });
 });
