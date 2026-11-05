@@ -1,5 +1,5 @@
 import { selectLocalMetaphor, validateSemanticSelection, selectCompositionAssets } from "@illustration-composer/core";
-import type { AssetCatalog, AssetSize, AssetRole } from "@illustration-composer/core";
+import type { AssetCatalog, AssetSize, SecondaryRole } from "@illustration-composer/core";
 import { libraryConcepts, libraryProfiles } from "./library-semantics.js";
 
 function resolveMetaphorAssets(query: string, catalog: AssetCatalog) {
@@ -17,7 +17,7 @@ export function resolveMetaphorComposition(query: string, catalog: AssetCatalog)
     })) };
 }
 
-export function resolveMetaphorSelection(query: string, catalog: AssetCatalog, size: AssetSize, role: AssetRole) {
+export function resolveMetaphorSelection(query: string, catalog: AssetCatalog, size: AssetSize, role: SecondaryRole) {
   const result = resolveMetaphorAssets(query, catalog);
   return result.errors.length ? { selection: [], errors: result.errors, warnings: [] }
     : selectCompositionAssets(result.assets, size, role);

@@ -122,19 +122,48 @@ function addBackgrounds(
 ): Placement[] | null {
   const result = [...foreground];
   const margin = Math.min(width, height) * 0.04;
+  const canvas = { x: 0, y: 0, width, height };
+  const main = foreground[0]!;
   for (const index of indices) {
-    const box = fit(sources[index]!, index, width * 0.66 / Math.sqrt(indices.length), height * 0.66 / Math.sqrt(indices.length));
-    const possible = positions(box, width, height, margin).map(item => {
-      const covered = result.reduce((sum, other) => sum + intersection(item, other), 0);
-      const visible = Math.max(0, 1 - covered / (item.width * item.height));
-      const main = foreground[0]!;
-      const distance = Math.hypot((item.x + item.width / 2 - main.x - main.width / 2 + width * 0.12) / width,
-        (item.y + item.height / 2 - main.y - main.height / 2 + height * 0.18) / height);
-      return { item, visible, score: -Math.abs(visible - 0.65) * 0.4 - distance };
-    }).filter(candidate => candidate.visible >= 0.3);
-    possible.sort((a, b) => b.score - a.score);
-    if (!possible[0]) return null;
-    result.push(possible[0].item);
+    let best: { item: Placement; score: number } | undefined;
+    const density = Math.sqrt(indices.length);
+    for (const extent of [0.52, 0.74, 0.92]) {
+      const box = fit(sources[index]!, index, width * extent / density, height * extent / density);
+      const contained = positions(box, width, height, margin);
+      const raisedY = Math.max(margin, Math.min(height - margin - box.height,
+        main.y + (main.height - box.height) / 2 - height * 0.13));
+      const candidates = [...contained, ...nearPrimary(box, main, margin).filter(item =>
+        item.x >= 0 && item.y >= 0 && item.x + item.width <= width && item.y + item.height <= height)];
+      for (const { x } of contained.slice(0, 9)) candidates.push({ ...box, x, y: raisedY });
+      if (extent === 0.92 && indices.length === 1) {
+        // Let a single large background enter from one edge of the canvas.
+        const sideAnchors = contained.filter((_, position) => position % 18 === 0);
+        for (const y of [raisedY, ...sideAnchors.map(item => item.y)]) {
+          candidates.push({ ...box, x: -box.width * 0.14, y }, { ...box, x: width - box.width * 0.86, y });
+        }
+        for (const { x } of contained.slice(0, 9)) candidates.push({ ...box, x, y: -box.height * 0.14 });
+      }
+      for (const item of candidates) {
+        const area = item.width * item.height;
+        const inside = intersection(item, canvas);
+        const covered = result.reduce((sum, other) => sum + intersection(item, other), 0);
+        const visible = Math.max(0, inside - covered);
+        if (visible < area * 0.48) continue;
+        const dx = (item.x + item.width / 2 - main.x - main.width / 2) / width;
+        const dy = (item.y + item.height / 2 - main.y - main.height / 2) / height;
+        const gapX = Math.max(0, Math.abs(dx) - (main.width + item.width) / (2 * width));
+        const gapY = Math.max(0, Math.abs(dy) - (main.height + item.height) / (2 * height));
+        const depth = intersection(item, main) / area;
+        const presence = Math.min(visible / (main.width * main.height), 1.25);
+        const edgeEntry = inside < area * 0.99 && (item.y < 0 ? item.height / height : item.width / width) > 0.8;
+        const score = presence * 0.4 - Math.hypot(gapX, gapY) - Math.abs(depth - 0.2) * 0.55
+          - Math.abs(dy + 0.13) * 1.05 - Math.max(0, dy + 0.05) * 1.5
+          - (1 - inside / area) * 0.2 + (edgeEntry ? 0.12 : 0);
+        if (!best || score > best.score) best = { item, score };
+      }
+    }
+    if (!best) return null;
+    result.push(best.item);
   }
   return result;
 }
@@ -163,8 +192,10 @@ export function createAutomaticComposition(
   if (!best) throw new Error("Предметам тесно. Выбери другой формат или сократи число предметов.");
   const items: CompositionItem[] = sources.map((source, index) => {
     const placed = best!.find(item => item.index === index)!;
+    // Later backgrounds were fitted behind the earlier ones.
+    const layer = source.variant.role === "background" ? { zIndex: -background.indexOf(index) } : {};
     return { assetId: source.assetId, variant: source.variant,
-      x: placed.x, y: placed.y, scale: placed.scale, rotation: 0 };
+      x: placed.x, y: placed.y, scale: placed.scale, rotation: 0, ...layer };
   });
   return { width, height, items, background: "pale" };
 }

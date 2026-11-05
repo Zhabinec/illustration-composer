@@ -36,6 +36,12 @@ describe("Composition variant selection", () => {
     expect(selectCompositionAssets([backgroundOnly], "L", "main").errors[0]).toContain("Первым укажи");
   });
 
+  it("automatically picks a supporting variant and keeps unavailable backgrounds in front", () => {
+    const result = selectCompositionAssets([coin, coin, coin, bush], "S", "auto");
+    expect(result.errors).toEqual([]);
+    expect(result.selection.map(item => item.variant.role)).toEqual(["main", "main", "background", "main"]);
+  });
+
   it("rejects empty and oversized requests", () => {
     expect(selectCompositionAssets([], "L", "main").errors).not.toHaveLength(0);
     expect(selectCompositionAssets(Array.from({ length: 9 }, () => bush), "L", "main").errors).not.toHaveLength(0);

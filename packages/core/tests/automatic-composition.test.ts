@@ -49,6 +49,17 @@ describe("automatic composition", () => {
     expect(areas[1]).toBeGreaterThan(areas[0]!);
   });
 
+  it("lets a large background enter from the edge while keeping the main subject in frame", () => {
+    const sources = [source("pen", 100, 600), source("book", 650, 500, "background")];
+    const { items: [main, background] } = createAutomaticComposition(800, 1200, sources);
+    const cropped = Math.max(-background!.x, background!.x + 650 * background!.scale - 800, -background!.y);
+    expect(cropped).toBeGreaterThan(0);
+    expect(cropped).toBeLessThanOrEqual(0.15 * 650 * background!.scale);
+    expect(650 * background!.scale).toBeGreaterThan(100 * main!.scale);
+    expect(main!.y).toBeGreaterThan(0);
+    expect(main!.y + 600 * main!.scale).toBeLessThan(1200);
+  });
+
   it("preserves repeated instances, resource bindings, and inputs", () => {
     const sources = [source("coin", 300, 220), source("coin", 300, 220)];
     const before = JSON.stringify(sources);

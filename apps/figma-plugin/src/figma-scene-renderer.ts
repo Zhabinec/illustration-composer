@@ -14,6 +14,7 @@ export class FigmaSceneRenderer {
     try {
       frame.name = name;
       frame.resize(scene.width, scene.height);
+      frame.clipsContent = true;
       frame.setSharedPluginData("illustrationComposer", "scene", "1");
       frame.setSharedPluginData("illustrationComposer", "palette-id", palette.id);
       if (scene.background) {

@@ -1,5 +1,5 @@
 import { resolveAssetNames, selectCompositionAssets } from "@illustration-composer/core";
-import type { AssetCatalog, AssetSize, AssetRole } from "@illustration-composer/core";
+import type { AssetCatalog, AssetSize, SecondaryRole } from "@illustration-composer/core";
 
 const aliases: Readonly<Record<string, readonly string[]>> = {
   book: ["книги"], phone: ["телефоны", "смартфон", "смартфоны"],
@@ -8,7 +8,7 @@ const aliases: Readonly<Record<string, readonly string[]>> = {
   folder: ["папки"], pen: ["ручки"], wallet: ["кошельки"]
 };
 
-export function resolveNamedComposition(query: string, catalog: AssetCatalog, size: AssetSize, role: AssetRole) {
+export function resolveNamedComposition(query: string, catalog: AssetCatalog, size: AssetSize, role: SecondaryRole) {
   const resolved = resolveAssetNames(query, catalog, aliases);
   const messages = resolved.issues.map(issue => {
     if (issue.kind === "empty") return "Введи названия предметов.";
@@ -22,7 +22,7 @@ export function resolveNamedComposition(query: string, catalog: AssetCatalog, si
   return { ...selected, errors: [...messages, ...selected.errors] };
 }
 
-export function postNamedCompositionResolution(query: string, catalog: AssetCatalog, size: AssetSize, role: AssetRole) {
+export function postNamedCompositionResolution(query: string, catalog: AssetCatalog, size: AssetSize, role: SecondaryRole) {
   const result = resolveNamedComposition(query, catalog, size, role);
   figma.ui.postMessage({
     type: "names-resolved", query, size, role,

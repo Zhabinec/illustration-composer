@@ -12,7 +12,8 @@ import {
 import type {
   Asset,
   ColorPalette,
-  CompositionSource
+  CompositionSource,
+  SecondaryRole
 } from "@illustration-composer/core";
 
 import { FigmaLibraryScanner } from "./figma-library-scanner.js";
@@ -93,6 +94,10 @@ function roleField(value: unknown): Role {
   }
 
   return value;
+}
+
+function secondaryRoleField(value: unknown): SecondaryRole {
+  return value === "auto" ? value : roleField(value);
 }
 
 async function resourceNode(
@@ -488,7 +493,7 @@ async function main(): Promise<void> {
       }
 
       const size = sizeField(message.size);
-      const secondaryRole = roleField(
+      const secondaryRole = secondaryRoleField(
         message.secondaryRole
       );
 
@@ -549,11 +554,9 @@ async function main(): Promise<void> {
           throw new Error(`Unknown asset: ${item.id}`);
         }
 
-        const variant = activeVariant(
-          asset,
-          size,
-          item.role
-        );
+        const variant = item.role === "auto"
+          ? activeVariant(asset, size, "background") ?? activeVariant(asset, size, "main")
+          : activeVariant(asset, size, item.role);
 
         if (!variant) {
           throw new Error(
@@ -696,7 +699,7 @@ async function main(): Promise<void> {
           case "resolve-names": {
             const catalog = toAssetCatalog(new LibraryRegistry(state.registry));
             postNamedCompositionResolution(typeof message.names === "string" ? message.names : "",
-              catalog, sizeField(message.size), roleField(message.secondaryRole));
+              catalog, sizeField(message.size), secondaryRoleField(message.secondaryRole));
             break;
           }
           case "refresh": {
