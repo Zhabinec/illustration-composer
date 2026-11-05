@@ -1,6 +1,6 @@
 import { element, fillSelect } from "./dom.js";
 
-function numberField(labelText, value, min, max, placeholder) {
+export function numberField(labelText, value, min, max, placeholder) {
   const label = document.createElement("label");
   label.textContent = labelText;
   const input = document.createElement("input");
@@ -23,11 +23,12 @@ export function mountCompositionItems(send) {
     cards.forEach(({ asset, variant, heading, item, card, preview }, index) => {
       const isPrimary = index === Number(primary.value);
       heading.textContent = `${asset.name}${isPrimary ? " · главный" : ""}`;
-      const options = asset.variants.filter(entry => entry.active && (!isPrimary || entry.role === "main"));
-      const preferred = options.find(entry => entry.role === item.role && entry.size === item.size);
+      const options = asset.variants.filter(entry => entry.active);
+      const preferred = options.find(entry => entry.role === "main" && entry.size === item.size)
+        ?? options.find(entry => entry.role === "main");
       const previous = variant.value;
       fillSelect(variant, options.map(entry => ({
-        value: entry.id, label: `${entry.role === "main" ? "Передний план" : "Фоновый предмет"} · версия ${entry.size}`
+        value: entry.id, label: `Версия ${entry.size} · ${entry.role === "main" ? "цветной рисунок" : "рисунок в цветах фона"}`
       })));
       if (!options.some(entry => entry.id === previous) && preferred) variant.value = preferred.id;
       if (card.open) preview();
@@ -51,6 +52,12 @@ export function mountCompositionItems(send) {
       variantLabel.textContent = "Вариант из библиотеки";
       const variant = document.createElement("select");
       variantLabel.appendChild(variant);
+      const layerLabel = document.createElement("label");
+      layerLabel.textContent = "Слой в композиции";
+      const layer = document.createElement("select");
+      fillSelect(layer, [{ value: "main", label: "Перед другими предметами" },
+        { value: "background", label: "Позади других предметов" }], false);
+      layerLabel.appendChild(layer);
       const thumbnail = document.createElement("img");
       thumbnail.className = "preview";
       thumbnail.alt = `Выбранный вариант предмета «${asset.name}»`;
@@ -63,7 +70,7 @@ export function mountCompositionItems(send) {
       card.ontoggle = () => { if (card.open) preview(); };
       const help = document.createElement("p");
       help.className = "muted";
-      help.textContent = "Фоновый вариант ставится позади других предметов. Выберите версию S или L по миниатюре.";
+      help.textContent = "Рисунок можно выбрать по миниатюре. Слой задаётся отдельно.";
       const x = numberField("Центр слева, %", "", 0, 100, "Авто");
       const y = numberField("Центр сверху, %", "", 0, 100, "Авто");
       const positionLabel = document.createElement("label");
@@ -92,22 +99,21 @@ export function mountCompositionItems(send) {
       const coordinatesLabel = document.createElement("summary");
       coordinatesLabel.textContent = "Точное положение центра";
       coordinates.append(coordinatesLabel, position);
-      card.append(heading, variantLabel, thumbnail, help, positionLabel, transform, coordinates);
+      card.append(heading, variantLabel, thumbnail, help, layerLabel, positionLabel, transform, coordinates);
       root.appendChild(card);
-      cards.push({ asset, item, heading, variant, card, preview, thumbnail,
+      cards.push({ asset, item, heading, variant, layer, card, preview, thumbnail, coordinates,
         x: x.input, y: y.input, scale: scale.input, rotation: rotation.input });
     });
-    fillSelect(primary, cards.length ? cards.flatMap(({ asset }, index) =>
-      asset.variants.some(entry => entry.active && entry.role === "main") ? [{ value: String(index), label: asset.name }] : []
-    ) : [{ value: "", label: "Выбрать автоматически" }], false);
+    fillSelect(primary, cards.length ? cards.map(({ asset }, index) => ({ value: String(index), label: asset.name }))
+      : [{ value: "", label: "Выбрать автоматически" }], false);
     updateVariants();
   }
 
   function read() {
     const settings = [];
-    for (const { asset, variant, x, y, scale, rotation } of cards) {
+    for (const { asset, variant, layer, x, y, scale, rotation } of cards) {
       if (!variant.value || ![x, y, scale, rotation].every(input => input.reportValidity())) return null;
-      settings.push({ assetId: asset.id, variantId: variant.value,
+      settings.push({ assetId: asset.id, variantId: variant.value, layer: layer.value,
         x: x.value === "" ? undefined : Number(x.value), y: y.value === "" ? undefined : Number(y.value),
         scale: Number(scale.value || 100), rotation: Number(rotation.value || 0) });
     }
@@ -121,5 +127,11 @@ export function mountCompositionItems(send) {
       thumbnail.hidden = false;
     }
   }
-  return { show, read, receiveThumbnail };
+  function openPlacement() {
+    for (const { card, coordinates } of cards) {
+      card.open = true;
+      coordinates.open = true;
+    }
+  }
+  return { show, read, receiveThumbnail, openPlacement };
 }

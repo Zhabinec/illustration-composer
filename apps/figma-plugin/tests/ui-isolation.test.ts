@@ -13,7 +13,7 @@ const script = buildSync({
 function node() {
   return {
     value: "", textContent: "", hidden: false,
-    dataset: {}, classList: { toggle: vi.fn() },
+    dataset: {}, style: {}, classList: { toggle: vi.fn() },
     append: vi.fn(), appendChild: vi.fn(), replaceChildren: vi.fn(), setAttribute: vi.fn()
   };
 }

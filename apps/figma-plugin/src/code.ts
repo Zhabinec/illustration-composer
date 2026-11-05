@@ -31,7 +31,7 @@ import type { RegistryDocument } from "./figma-registry-store.js";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
 import { planAutomaticScene } from "./automatic-scene-planner.js";
-import { addAutomaticDecoration, applyReferenceStyle, setSceneBackground } from "./figma-scene-style.js";
+import { addAutomaticDecoration, addChosenDecoration, applyReferenceStyle, referenceDecor, setSceneBackground } from "./figma-scene-style.js";
 import { applyCompositionItemSettings, readCompositionItemSettings } from "./composition-item-settings.js";
 import { discoverExampleTemplates } from "./figma-example-templates.js";
 import { handleTemplateMessage } from "./template-messages.js";
@@ -99,7 +99,7 @@ function roleField(value: unknown): Role {
 }
 
 function secondaryRoleField(value: unknown): SecondaryRole {
-  return value === "auto" ? value : roleField(value);
+  return value === "auto" || value === "independent" ? value : roleField(value);
 }
 
 async function resourceNode(
@@ -491,7 +491,7 @@ async function main(): Promise<void> {
 
       const layout = stringField(message, "layout");
 
-      if (layout !== "focus" && layout !== "row" && layout !== "automatic") {
+      if (layout !== "focus" && layout !== "row" && layout !== "automatic" && layout !== "manual") {
         throw new Error("Invalid layout");
       }
 
@@ -572,11 +572,13 @@ async function main(): Promise<void> {
         const setting = settings[index];
         const chosen = setting && state.registry.assets.find(entry => entry.id === item.id)?.variants
           .find(entry => entry.id === setting.variantId && entry.active);
-        if (setting && (!chosen || (index === 0 && chosen.role !== "main"))) {
+        if (setting && !chosen) {
           throw new Error(`«${asset.name}»: выберите доступный вариант предмета.`);
         }
-        const variant = chosen ? { role: chosen.role, size: chosen.size, resourceKey: chosen.resourceKey } : item.role === "auto"
-          ? activeVariant(asset, size, "background") ?? activeVariant(asset, size, "main")
+        const variant = chosen ? { role: index === 0 ? "main" as const : setting?.layer ?? chosen.role,
+          size: chosen.size, resourceKey: chosen.resourceKey } : item.role === "auto" || item.role === "independent"
+          ? (item.role === "auto" ? activeVariant(asset, size, "background") ?? activeVariant(asset, size, "main")
+            : activeVariant(asset, size, "main") ?? activeVariant(asset, size, "background"))
           : activeVariant(asset, size, item.role);
 
         if (!variant) {
@@ -591,7 +593,7 @@ async function main(): Promise<void> {
 
         sources.push({
           assetId: asset.id,
-          variant,
+          variant: secondaryRole === "independent" && !setting ? { ...variant, role: "main" } : variant,
           ...dimensions,
           emphasis: item.emphasis
         });
@@ -624,7 +626,7 @@ async function main(): Promise<void> {
           );
 
       const scene = applyCompositionItemSettings(planned, sources, settings);
-      if (!preview && requestCompositionAdjustment(message,
+      if (!preview && layout !== "manual" && requestCompositionAdjustment(message,
         (scene.shrinkSuggestions ?? []).map(item => ({
           name: catalog.getById(item.assetId)?.name ?? item.assetId.value,
           percent: Math.round(item.scale * 100)
@@ -646,13 +648,15 @@ async function main(): Promise<void> {
         const background = message.background ?? "pale";
         const decoration = message.decoration ?? "auto";
         if (background === "reference") {
-          await applyReferenceStyle(frame, stringField(message, "referenceId"), decoration === "reference" ? "both" : "background",
+          await applyReferenceStyle(frame, stringField(message, "backgroundReferenceId"), "background",
             paletteSourceNodeIds(state.palettes), palette);
         } else {
           setSceneBackground(frame, background, palette);
         }
-        if (decoration === "reference" && background !== "reference") {
+        if (decoration === "reference") {
           await applyReferenceStyle(frame, stringField(message, "referenceId"), "decor", paletteSourceNodeIds(state.palettes), palette);
+        } else if (decoration === "choose") {
+          await addChosenDecoration(frame, message.decorations, paletteSourceNodeIds(state.palettes), palette);
         } else if (decoration === "auto") {
           await addAutomaticDecoration(frame, paletteSourceNodeIds(state.palettes), palette);
         }
@@ -913,8 +917,17 @@ async function main(): Promise<void> {
             const { templates } = await discoverExampleTemplates(paletteSourceNodeIds(state.palettes));
             const template = templates.find(item => item.sourceNodeId === message.referenceId);
             if (!template) throw new Error("Пример недоступен.");
+            const source = await figma.getNodeByIdAsync(template.sourceNodeId);
+            const decorations = source?.type === "FRAME" ? await Promise.all(referenceDecor(source).map(async (layer, index) => {
+              let image: string | null = null;
+              try {
+                const bytes = await layer.exportAsync({ format: "PNG", constraint: { type: "WIDTH", value: 160 } });
+                image = `data:image/png;base64,${figma.base64Encode(bytes)}`;
+              } catch { /* Some thin vectors have no raster preview. */ }
+              return { id: layer.id, name: layer.type === "LINE" ? `Линия ${index + 1}` : layer.name, image };
+            })) : [];
             figma.ui.postMessage({ type: "compose-reference-image", referenceId: template.sourceNodeId,
-              image: await thumbnail(template.sourceNodeId) });
+              image: await thumbnail(template.sourceNodeId), decorations });
             break;
           }
         }

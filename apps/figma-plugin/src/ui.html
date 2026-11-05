@@ -196,6 +196,7 @@
           <option value="automatic">Подобрать автоматически</option>
           <option value="focus">Главный крупнее</option>
           <option value="row">Слева направо</option>
+          <option value="manual">Поставить вручную</option>
         </select>
       </div>
       <div>
@@ -203,20 +204,39 @@
         <select id="compose-primary"><option value="">Выбрать автоматически</option></select>
       </div>
     </div>
-    <h3>Оформление</h3>
+    <p id="compose-manual-help" class="muted" hidden>Укажите позицию в карточке каждого предмета. Пустые координаты берутся из стартовой расстановки.</p>
+    <h3>Фон</h3>
     <div class="inline">
-      <label>Фон<select id="compose-background">
-        <option value="pale">Мягкий цвет палитры</option><option value="light">Насыщенный цвет палитры</option>
-        <option value="white">Белый</option><option value="transparent">Прозрачный</option><option value="reference">Из примера</option>
+      <label>Цвет холста<select id="compose-background" aria-describedby="compose-background-help">
+        <option value="pale">Самый светлый из палитры</option><option value="light">Более заметный из палитры</option>
+        <option value="white">Белый</option><option value="custom">Свой цвет</option>
+        <option value="transparent">Без заливки</option><option value="reference">Цвет холста из шаблона</option>
       </select></label>
-      <label>Декор<select id="compose-decoration">
-        <option value="auto">Подобрать линии и украшения</option><option value="reference">Взять из примера</option><option value="none">Без декора</option>
-      </select></label>
+      <label id="compose-color-label" hidden>Цвет заливки<input type="color" id="compose-color" value="#eee2f6"></label>
+      <div id="compose-background-swatch" aria-hidden="true" style="min-width:38px;min-height:38px;border:1px solid var(--figma-color-border);border-radius:8px"></div>
     </div>
+    <p id="compose-background-help" class="muted">Это заливка под всеми предметами. Самый светлый цвет берётся из выбранной палитры.</p>
+    <div id="compose-background-example" hidden>
+      <label>Шаблон для фона<select id="compose-background-reference"></select></label>
+      <img id="compose-background-image" class="preview" alt="Шаблон, из которого берётся заливка холста" hidden>
+    </div>
+    <h3>Декор</h3>
+      <label>Декор<select id="compose-decoration">
+        <option value="auto">Автоматически</option><option value="reference">Из шаблона</option>
+        <option value="choose">Выбрать вручную</option><option value="none">Без декора</option>
+      </select></label>
+    <p id="compose-decoration-help" class="muted">Плагин выбирает украшения, которые помещаются между предметами.</p>
     <div id="compose-example-panel" hidden>
       <label for="compose-reference">Авторский пример</label><select id="compose-reference"></select>
       <img id="compose-reference-image" class="preview" alt="Авторская композиция" hidden>
+      <div id="compose-decoration-choices" hidden>
+        <label>Украшение из примера<select id="compose-decoration-choice"></select></label>
+        <img id="compose-decoration-image" class="preview" alt="Выбранное украшение" hidden>
+        <button id="compose-decoration-add" disabled>Добавить декор</button>
+      </div>
     </div>
+    <div id="compose-decoration-items" hidden></div>
+    <h3>Оформление</h3>
     <div class="inline">
       <label>Формат<select id="format">
         <option value="landscape">Горизонтальный · 1200 × 800</option><option value="square">Квадрат · 1000 × 1000</option>

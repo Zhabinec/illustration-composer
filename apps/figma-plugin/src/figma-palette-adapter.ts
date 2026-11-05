@@ -3,14 +3,15 @@ import type { ColorPalette, ColorRole } from "@illustration-composer/core";
 
 export class FigmaPaletteAdapter {
   applyToSurface(frame: FrameNode, palette: ColorPalette): void {
-    if (Array.isArray(frame.fills)) frame.fills = this.recolorPaints(frame, "fills", frame.fills, palette);
+    if (frame.getSharedPluginData("illustrationComposer", "fixed-background") !== "1" &&
+      Array.isArray(frame.fills)) frame.fills = this.recolorPaints(frame, "fills", frame.fills, palette);
   }
 
-  apply(root: GroupNode | FrameNode | VectorNode, palette: ColorPalette): void {
+  apply(root: SceneNode, palette: ColorPalette): void {
     const descendants = "findAll" in root ? root.findAll(() => true) : [];
     const nodes: SceneNode[] = [root, ...descendants];
     for (const node of nodes) {
-      if ("fills" in node) {
+      if ("fills" in node && node.getSharedPluginData("illustrationComposer", "fixed-background") !== "1") {
         const fills = node.fills;
         if (Array.isArray(fills)) {
           const updated = this.recolorPaints(node, "fills", fills, palette);

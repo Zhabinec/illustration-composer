@@ -1,8 +1,9 @@
-import type { CompositionScene, CompositionSource } from "@illustration-composer/core";
+import type { AssetRole, CompositionScene, CompositionSource } from "@illustration-composer/core";
 
 export interface CompositionItemSettings {
   assetId: string;
   variantId: string;
+  layer?: AssetRole;
   x?: number;
   y?: number;
   scale: number;
@@ -25,7 +26,9 @@ export function readCompositionItemSettings(value: unknown): CompositionItemSett
     };
     const x = number("x", 0, 100);
     const y = number("y", 0, 100);
-    return { assetId: item.assetId, variantId: item.variantId, ...(x === undefined ? {} : { x }),
+    const layer = "layer" in item ? item.layer : undefined;
+    if (layer !== undefined && layer !== "main" && layer !== "background") throw new Error("Выберите слой предмета.");
+    return { assetId: item.assetId, variantId: item.variantId, ...(layer === undefined ? {} : { layer }), ...(x === undefined ? {} : { x }),
       ...(y === undefined ? {} : { y }), scale: number("scale", 25, 250)!, rotation: number("rotation", -180, 180)! };
   });
 }
@@ -36,7 +39,8 @@ export function applyCompositionItemSettings(
   if (!settings.length) return scene;
   return { ...scene, items: scene.items.map((item, index) => {
     const setting = settings[index]!;
-    if (setting.x === undefined && setting.y === undefined && setting.scale === 100 && setting.rotation === 0) return item;
+    const variant = setting.layer ? { ...item.variant, role: setting.layer } : item.variant;
+    if (setting.x === undefined && setting.y === undefined && setting.scale === 100 && setting.rotation === 0) return { ...item, variant };
     const source = sources[index]!;
     const scale = item.scale * setting.scale / 100;
     const centerX = setting.x === undefined ? item.x + source.width * item.scale / 2 : scene.width * setting.x / 100;
@@ -44,7 +48,7 @@ export function applyCompositionItemSettings(
     const angle = setting.rotation * Math.PI / 180;
     const halfWidth = source.width * scale / 2;
     const halfHeight = source.height * scale / 2;
-    return { ...item, scale, rotation: setting.rotation,
+    return { ...item, variant, scale, rotation: setting.rotation,
       x: centerX - Math.cos(angle) * halfWidth - Math.sin(angle) * halfHeight,
       y: centerY + Math.sin(angle) * halfWidth - Math.cos(angle) * halfHeight };
   }) };

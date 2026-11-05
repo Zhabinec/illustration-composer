@@ -2,7 +2,7 @@ import { findAssetVariant } from "../catalog/asset.js";
 import type { Asset, AssetRole, AssetSize, AssetVariant } from "../catalog/asset.js";
 
 export const maxCompositionObjects = 8;
-export type SecondaryRole = AssetRole | "auto";
+export type SecondaryRole = AssetRole | "auto" | "independent";
 
 export interface SelectedCompositionAsset {
   asset: Asset;
@@ -30,7 +30,9 @@ export function selectCompositionAssets(
     }
   }
   assets.forEach((asset, index) => {
-    const role = index === 0 ? "main" : secondaryRole === "auto"
+    const role = secondaryRole === "independent"
+      ? (asset.variants.some(variant => variant.role === "main") ? "main" : "background")
+      : index === 0 ? "main" : secondaryRole === "auto"
       ? (index === backgroundIndex || !asset.variants.some(variant => variant.role === "main") ? "background" : "main")
       : secondaryRole;
     const variant = findAssetVariant(asset, size, role) ?? findAssetVariant(asset, size === "L" ? "S" : "L", role);

@@ -16,19 +16,27 @@ export function referenceDecor(source: FrameNode): DecorationLayer[] {
 }
 
 export function setSceneBackground(scene: FrameNode, choice: unknown, palette: ColorPalette): void {
-  if (choice !== "pale" && choice !== "light" && choice !== "white" && choice !== "transparent") {
+  const customHex = typeof choice === "string" && /^#[0-9a-f]{6}$/i.test(choice) ? choice : undefined;
+  if (!customHex && choice !== "pale" && choice !== "light" && choice !== "white" && choice !== "transparent") {
     throw new Error("Выберите фон холста.");
   }
-  const hex = choice === "pale" || choice === "light" ? sourceColors[choice] : "#FFFFFF";
+  const hex = customHex ?? (choice === "pale" || choice === "light" ? sourceColors[choice] : "#FFFFFF");
   const fills: Paint[] = choice === "transparent" ? [] : [{ type: "SOLID", color: {
     r: parseInt(hex.slice(1, 3), 16) / 255, g: parseInt(hex.slice(3, 5), 16) / 255, b: parseInt(hex.slice(5, 7), 16) / 255
   } }];
   const content = scene.children.find(node => node.id === scene.getSharedPluginData(namespace, "template-content"));
-  applyBackground(content?.type === "FRAME" ? content : scene, fills, palette);
+  const frame = content?.type === "FRAME" ? content : scene;
+  if (customHex) {
+    frame.fills = fills;
+    frame.setSharedPluginData(namespace, "fixed-background", "1");
+  } else {
+    applyBackground(frame, fills, palette);
+  }
 }
 
 function applyBackground(frame: FrameNode, fills: readonly Paint[], palette: ColorPalette): void {
   frame.fills = fills;
+  frame.setSharedPluginData(namespace, "fixed-background", "");
   frame.setSharedPluginData(namespace, "fills-roles", "");
   new FigmaPaletteAdapter().applyToSurface(frame, palette);
 }
@@ -48,6 +56,55 @@ export async function applyReferenceStyle(
   const source = await figma.getNodeByIdAsync(style.id);
   if (source?.type !== "FRAME" || !Array.isArray(source.fills)) throw new Error("Фон примера недоступен.");
   copyReferenceStyle(scene, source, mode, palette);
+}
+
+export async function addChosenDecoration(
+  scene: FrameNode, entries: unknown, paletteSourceIds: readonly string[], palette: ColorPalette
+): Promise<void> {
+  if (!Array.isArray(entries) || !entries.length || entries.length > 12) throw new Error("Добавьте от 1 до 12 украшений.");
+  const { templates } = await discoverExampleTemplates(paletteSourceIds);
+  const sources = new Map<string, FrameNode>();
+  for (const [index, entry] of entries.entries()) {
+    if (!entry || typeof entry !== "object" || typeof entry.sourceId !== "string" || typeof entry.layerId !== "string") {
+      throw new Error("Выберите украшение из библиотеки.");
+    }
+    const coordinate = (value: unknown, min: number, max: number) => {
+      if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+        throw new Error("Проверьте положение, масштаб и поворот декора.");
+      }
+      return value;
+    };
+    let source = sources.get(entry.sourceId);
+    if (!source && templates.some(template => template.sourceNodeId === entry.sourceId)) {
+      const node = await figma.getNodeByIdAsync(entry.sourceId);
+      if (node?.type === "FRAME") {
+        source = node;
+        sources.set(entry.sourceId, source);
+      }
+    }
+    const layer = source && referenceDecor(source).find(item => item.id === entry.layerId);
+    if (!source || !layer) throw new Error("Это украшение больше недоступно.");
+    assertVectorContent(layer);
+    const fit = decorationFit(scene, source);
+    const [[a, c, x], [b, d, y]] = layer.relativeTransform;
+    const centerX = entry.x === undefined ? fit.offsetX + fit.scale * (x + a * layer.width / 2 + c * layer.height / 2)
+      : scene.width * coordinate(entry.x, 0, 100) / 100;
+    const centerY = entry.y === undefined ? fit.offsetY + fit.scale * (y + b * layer.width / 2 + d * layer.height / 2)
+      : scene.height * coordinate(entry.y, 0, 100) / 100;
+    const scale = fit.scale * coordinate(entry.scale, 25, 250) / 100;
+    const rotation = coordinate(entry.rotation, -180, 180);
+    const copy = layer.clone();
+    scene.insertChild(index, copy);
+    copy.name = `Декор · ${layer.name}`;
+    copy.setSharedPluginData(namespace, "composition-role", "background");
+    copy.rescale(scale);
+    copy.relativeTransform = [[a, c, 0], [b, d, 0]];
+    copy.rotation += rotation;
+    const [[ra, rc], [rb, rd]] = copy.relativeTransform;
+    copy.x = centerX - ra * copy.width / 2 - rc * copy.height / 2;
+    copy.y = centerY - rb * copy.width / 2 - rd * copy.height / 2;
+    new FigmaPaletteAdapter().apply(copy, palette);
+  }
 }
 
 export async function addAutomaticDecoration(scene: FrameNode, paletteSourceIds: readonly string[], palette: ColorPalette): Promise<void> {
