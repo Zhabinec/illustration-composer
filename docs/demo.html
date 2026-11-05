@@ -20,7 +20,8 @@
   <p class="muted">Figma-плагин собирает иллюстрации из исходных редактируемых векторов.</p>
   <div class="controls" aria-label="Сценарии задания">
     <button id="title-mode" aria-pressed="true">1. По заголовку</button>
-    <button id="names-mode" aria-pressed="false">2. По названиям</button>
+    <button id="names-mode" aria-pressed="false">2. Телефон и пазлы</button>
+    <button id="portrait-mode" aria-pressed="false">3. Наушники и цветы</button>
     <button id="play">Показать шаги</button>
   </div>
   <article>
@@ -38,9 +39,12 @@
 const examples = [
   { heading:'Финансовая безопасность', input:'Финансовая безопасность', objects:'Монета с замком + кошелёк', settings:'1200 × 800 · лазурная палитра из JSON', image:'examples/finance-azure.svg',
     steps:['Ввести заголовок и нажать «Создать композицию».','Плагин выбирает существующие предметы и размещает их.','Скачать SVG: в файле остаются векторные пути и группы.'] },
-  { heading:'Телефон на книге', input:'Телефон, книга', objects:'Телефон + открытая книга', settings:'800 × 1200 · исходная палитра', image:'examples/phone-on-book-portrait.svg',
-    steps:['Выбрать «По названиям предметов» и ввести состав.','Создать сцену: телефон размещается на странице книги.','Редактировать предметы и скачать векторную композицию.'] }
+  { heading:'Телефон и пазлы', input:'Телефон, Пазлы', objects:'Телефон + пазлы', settings:'1200 × 630 · мятная палитра', image:'examples/phone-puzzles-composed-mint.svg',
+    steps:['Ввести названия предметов и выбрать ручную расстановку.','Задать координаты и ширину предметов, выбрать фон и декор.','Создать композицию и скачать SVG в «Редакторе».'] },
+  { heading:'Наушники и цветы', input:'Наушники, Цветы', objects:'Наушники + фоновый вариант цветов', settings:'800 × 1200 · мятная палитра', image:'examples/headphones-flowers-composed-mint.svg',
+    steps:['Ввести названия и выбрать для цветов рисунок в цветах фона.','Поставить цветы позади наушников. Края выходящих за холст предметов обрезаются.','Создать композицию и скачать SVG в «Редакторе».'] }
 ];
+const modeButtons = ['title-mode', 'names-mode', 'portrait-mode'];
 let selected = 0, timer;
 const byId = id => document.getElementById(id);
 function show(index) {
@@ -48,10 +52,10 @@ function show(index) {
   const example=examples[index];
   for(const key of ['heading','input','objects','settings']) byId(key).textContent=example[key];
   byId('result').src=example.image; byId('result').alt=example.heading; byId('download').href=example.image;
-  byId('title-mode').setAttribute('aria-pressed',String(index===0)); byId('names-mode').setAttribute('aria-pressed',String(index===1));
+  modeButtons.forEach((id, position) => byId(id).setAttribute('aria-pressed',String(index===position)));
   byId('steps').replaceChildren(...example.steps.map(text=>{const li=document.createElement('li');li.textContent=text;return li;}));
 }
-byId('title-mode').onclick=()=>show(0); byId('names-mode').onclick=()=>show(1);
+modeButtons.forEach((id, index) => { byId(id).onclick = () => show(index); });
 byId('play').onclick=()=>{
   show(selected); let step=0; const items=Array.from(byId('steps').children); byId('play').textContent='Повторить';
   const advance=()=>{items.forEach((item,index)=>index===step?item.setAttribute('aria-current','step'):item.removeAttribute('aria-current'));step++;if(step===items.length)clearInterval(timer);};

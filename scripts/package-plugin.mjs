@@ -1,19 +1,29 @@
-import { mkdirSync, copyFileSync, cpSync, writeFileSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { mkdirSync, copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join, dirname, basename } from "node:path";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const artifacts = join(root, "artifacts");
-const folder = join(artifacts, `package-${randomUUID()}`, "Illustration Composer");
 const archive = join(artifacts, "illustration-composer-plugin.zip");
-mkdirSync(join(folder, "dist"), { recursive: true });
-copyFileSync(join(root, "apps/figma-plugin/manifest.json"), join(folder, "manifest.json"));
-copyFileSync(join(root, "apps/figma-plugin/dist/code.js"), join(folder, "dist/code.js"));
-copyFileSync(join(root, "apps/figma-plugin/dist/ui.html"), join(folder, "dist/ui.html"));
-cpSync(join(root, "docs"), join(folder, "docs"), { recursive: true });
-writeFileSync(join(folder, "README.md"), `# Illustration Composer — готовый Figma-плагин
+mkdirSync(artifacts, { recursive: true });
+const staging = mkdtempSync(join(artifacts, "package-"));
+const folder = join(staging, "Illustration Composer");
+try {
+  const files = [
+    ["apps/figma-plugin/manifest.json", "manifest.json"],
+    ["apps/figma-plugin/dist/code.js", "dist/code.js"],
+    ["apps/figma-plugin/dist/ui.html", "dist/ui.html"],
+    ...["acceptance.md", "demo.md", "demo.html", "examples/mint-compositions.md",
+      "examples/finance-azure.svg", "examples/azure-palette.json", "examples/phone-puzzles-composed-mint.svg",
+      "examples/headphones-flowers-composed-mint.svg"].map(path => [`docs/${path}`, `docs/${path}`])
+  ];
+  for (const [source, target] of files) {
+    const destination = join(folder, target);
+    mkdirSync(dirname(destination), { recursive: true });
+    copyFileSync(join(root, source), destination);
+  }
+  writeFileSync(join(folder, "README.md"), `# Illustration Composer — готовый Figma-плагин
 
 1. Распакуйте эту папку.
 2. В Figma Desktop откройте Plugins → Development → Import plugin from manifest.
@@ -24,10 +34,13 @@ writeFileSync(join(folder, "README.md"), `# Illustration Composer — готов
 Исходный проект пересобирается командами npm ci, npm run check, npm run package.
 Библиотека: https://www.figma.com/design/tf9r6w2FlDXhb0EXrEcvTh/?node-id=26-11438
 
-Короткая демонстрация: docs/demo.html. Приёмка: docs/acceptance.md.
+Короткая демонстрация с тремя SVG: docs/demo.html. Приёмка: docs/acceptance.md.
 Поддерживаются сборка по заголовку и названиям, редактирование объектов,
 палитры и векторный SVG-экспорт. Подбор локальный по образам библиотеки,
 а не внешняя LLM. При разработке использован Codex: анализ, код, тесты и UI-проверки.
 `);
-execFileSync("tar.exe", ["--format=zip", "-cf", archive, "-C", dirname(folder), basename(folder)], { stdio: "inherit" });
+  execFileSync("tar.exe", ["--format=zip", "-cf", archive, "-C", staging, basename(folder)], { stdio: "inherit" });
+} finally {
+  rmSync(staging, { recursive: true, force: true });
+}
 console.log(archive);
