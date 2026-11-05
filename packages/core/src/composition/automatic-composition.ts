@@ -119,11 +119,12 @@ function foregroundCandidates(
 function addBackgrounds(
   foreground: readonly Placement[], width: number, height: number,
   sources: readonly CompositionSource[], indices: readonly number[]
-): Placement[] | null {
+): { placements: Placement[]; quality: number } | null {
   const result = [...foreground];
   const margin = Math.min(width, height) * 0.04;
   const canvas = { x: 0, y: 0, width, height };
   const main = foreground[0]!;
+  let quality = 0;
   for (const index of indices) {
     let best: { item: Placement; score: number } | undefined;
     const density = Math.sqrt(indices.length);
@@ -141,7 +142,9 @@ function addBackgrounds(
         for (const y of [raisedY, ...sideAnchors.map(item => item.y)]) {
           candidates.push({ ...box, x: -box.width * 0.14, y }, { ...box, x: width - box.width * 0.86, y });
         }
-        for (const { x } of contained.slice(0, 9)) candidates.push({ ...box, x, y: -box.height * 0.14 });
+        for (const { x } of contained.slice(0, 9)) {
+          candidates.push({ ...box, x, y: -box.height * 0.14 }, { ...box, x, y: -box.height * 0.28 });
+        }
       }
       for (const item of candidates) {
         const area = item.width * item.height;
@@ -154,18 +157,21 @@ function addBackgrounds(
         const gapX = Math.max(0, Math.abs(dx) - (main.width + item.width) / (2 * width));
         const gapY = Math.max(0, Math.abs(dy) - (main.height + item.height) / (2 * height));
         const depth = intersection(item, main) / area;
+        const accentOverlap = foreground.slice(1).reduce((sum, accent) =>
+          sum + intersection(item, accent) / (accent.width * accent.height), 0) / Math.max(1, foreground.length - 1);
         const presence = Math.min(visible / (main.width * main.height), 1.25);
         const edgeEntry = inside < area * 0.99 && (item.y < 0 ? item.height / height : item.width / width) > 0.8;
-        const score = presence * 0.4 - Math.hypot(gapX, gapY) - Math.abs(depth - 0.2) * 0.55
-          - Math.abs(dy + 0.13) * 1.05 - Math.max(0, dy + 0.05) * 1.5
-          - (1 - inside / area) * 0.2 + (edgeEntry ? 0.12 : 0);
+        const score = presence * 0.4 - Math.hypot(gapX, gapY) - Math.abs(depth - 0.12) * 0.85
+          - Math.abs(dy + 0.23) * 1.05 - Math.max(0, dy + 0.05) * 1.5
+          - accentOverlap * 0.45 - (1 - inside / area) * 0.2 + (edgeEntry ? 0.12 : 0);
         if (!best || score > best.score) best = { item, score };
       }
     }
     if (!best) return null;
     result.push(best.item);
+    quality += best.score;
   }
-  return result;
+  return { placements: result, quality: quality / Math.max(1, indices.length) };
 }
 
 /** Plans independent vector placements; source geometry and library roles remain unchanged. */
@@ -184,14 +190,17 @@ export function createAutomaticComposition(
   const background = sources.flatMap((source, index) => source.variant.role === "background" ? [index] : []);
   const candidates = foregroundCandidates(width, height, sources, ordered)
     .sort((a, b) => score(b, width, height) - score(a, width, height));
-  let best: Placement[] | null = null;
+  let best: { placements: Placement[]; score: number } | undefined;
   for (const candidate of candidates) {
-    best = addBackgrounds(candidate, width, height, sources, background);
-    if (best) break;
+    const result = addBackgrounds(candidate, width, height, sources, background);
+    if (!result) continue;
+    const combinedScore = score(candidate, width, height) + result.quality;
+    if (!best || combinedScore > best.score) best = { placements: result.placements, score: combinedScore };
+    if (!background.length) break;
   }
   if (!best) throw new Error("Предметам тесно. Выбери другой формат или сократи число предметов.");
   const items: CompositionItem[] = sources.map((source, index) => {
-    const placed = best!.find(item => item.index === index)!;
+    const placed = best!.placements.find(item => item.index === index)!;
     // Later backgrounds were fitted behind the earlier ones.
     const layer = source.variant.role === "background" ? { zIndex: -background.indexOf(index) } : {};
     return { assetId: source.assetId, variant: source.variant,
