@@ -4,9 +4,12 @@ import { FigmaPaletteAdapter } from "./figma-palette-adapter.js";
 import { getTemplateSlots } from "./figma-template-slots.js";
 
 const namespace = "illustrationComposer";
-export type EditableObject = FrameNode | GroupNode | VectorNode;
+export type EditableObject = FrameNode | GroupNode | VectorNode | RectangleNode | EllipseNode |
+  PolygonNode | StarNode | BooleanOperationNode;
 function isEditableObject(node: SceneNode): node is EditableObject {
-  return node.type === "FRAME" || node.type === "GROUP" || node.type === "VECTOR";
+  return node.type === "FRAME" || node.type === "GROUP" || node.type === "VECTOR" ||
+    node.type === "RECTANGLE" || node.type === "ELLIPSE" || node.type === "POLYGON" ||
+    node.type === "STAR" || node.type === "BOOLEAN_OPERATION";
 }
 
 export function isComposerScene(node: BaseNode): node is FrameNode {
@@ -29,10 +32,14 @@ export function sceneObjects(scene: FrameNode): EditableObject[] {
 export function postSceneEditorState(scene?: FrameNode): void {
   const selected = figma.currentPage.selection[0];
   let ancestor: BaseNode | null = selected ?? null;
+  let nearestFrame: FrameNode | undefined;
   while (!scene && ancestor) {
     if (isComposerScene(ancestor)) scene = ancestor;
+    if (!nearestFrame && ancestor.type === "FRAME") nearestFrame = ancestor;
     ancestor = ancestor.parent;
   }
+  scene ??= nearestFrame;
+  if (scene && !canEditFrame(scene)) scene = undefined;
   if (!scene) { figma.ui.postMessage({ type: "scene-state", scene: null }); return; }
   const objects = sceneObjects(scene);
   let selectedObject: SceneNode | undefined;
@@ -52,10 +59,28 @@ export function postSceneEditorState(scene?: FrameNode): void {
   } });
 }
 
-export async function getEditableScene(id: string): Promise<FrameNode> {
+function canEditFrame(scene: FrameNode): boolean {
+  if (scene.layoutMode && scene.layoutMode !== "NONE") return false;
+  for (let node: BaseNode | null = scene; node; node = node.parent) {
+    if ("locked" in node && node.locked) return false;
+    if (node.type === "PAGE" && ["Библиотека компонентов", "Примеры композиций"].includes(node.name)) return false;
+  }
+  return true;
+}
+
+export async function getEditableScene(id: string, protectedIds: readonly string[] = []): Promise<FrameNode> {
   const scene = await figma.getNodeByIdAsync(id);
-  if (!scene || !isComposerScene(scene)) throw new Error("Выделите созданную композицию. Исходную библиотеку редактировать нельзя.");
-  if (scene.getSharedPluginData(namespace, "scene") !== "1") scene.setSharedPluginData(namespace, "scene", "1");
+  if (scene?.type !== "FRAME" || !canEditFrame(scene)) throw new Error("Выделите незаблокированный фрейм без авторазметки. Исходную библиотеку и примеры редактировать нельзя.");
+  if (protectedIds.length) {
+    const protectedNodes = new Set(protectedIds);
+    for (let node: BaseNode | null = scene; node; node = node.parent) {
+      if (protectedNodes.has(node.id)) throw new Error("Этот фрейм входит в исходную библиотеку.");
+    }
+    if (scene.findAll(node => protectedNodes.has(node.id)).some(node => protectedNodes.has(node.id))) {
+      throw new Error("В этом фрейме есть исходный ресурс библиотеки.");
+    }
+  }
+  if (isComposerScene(scene) && scene.getSharedPluginData(namespace, "scene") !== "1") scene.setSharedPluginData(namespace, "scene", "1");
   return scene;
 }
 
@@ -130,12 +155,12 @@ export function resizeScene(scene: FrameNode, width: number, height: number, pal
     throw new Error("Размер холста должен быть от 100 до 10000 пикселей.");
   }
   const scale = Math.min(width / scene.width, height / scene.height);
+  if (scale !== 1 && scene.children.some(child => !("rescale" in child))) throw new Error("Один из слоёв не поддерживает масштабирование.");
   const offsetX = (width - scene.width * scale) / 2;
   const offsetY = (height - scene.height * scale) / 2;
   for (const child of scene.children) {
     const [[a, c, x], [b, d, y]] = child.relativeTransform;
-    if (!("rescale" in child)) throw new Error("Этот слой не поддерживает масштабирование.");
-    child.rescale(scale);
+    if (scale !== 1 && "rescale" in child) child.rescale(scale);
     child.relativeTransform = [[a, c, x * scale + offsetX], [b, d, y * scale + offsetY]];
   }
   scene.resizeWithoutConstraints(width, height);

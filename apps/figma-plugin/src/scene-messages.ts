@@ -34,11 +34,13 @@ export async function handleSceneMessage(message: Record<string, unknown>, state
     figma.viewport.scrollAndZoomIntoView([scene]);
     figma.commitUndo();
     postSceneEditorState(scene);
+    figma.ui.postMessage({ type: "scene-new-created" });
     return true;
   }
   const actions = ["scene-add", "scene-replace", "scene-resize-object", "scene-select", "scene-transform", "scene-duplicate", "scene-delete", "scene-layer", "scene-settings", "scene-background", "scene-reference-style"];
   if (!actions.includes(message.type)) throw new Error("Неизвестная команда редактирования сцены.");
-  const scene = await getEditableScene(text(message, "sceneId"));
+  const scene = await getEditableScene(text(message, "sceneId"),
+    [...Object.values(state.sourceNodeIds), ...paletteSourceNodeIds(state.palettes)]);
   const paletteId = message.type === "scene-settings" ? text(message, "palette")
     : scene.getSharedPluginData("illustrationComposer", "palette-id") || text(message, "palette");
   const palette = state.palettes.find(item => item.id === paletteId) ?? resolvePalette(paletteId);

@@ -38,6 +38,17 @@ function canvas(children = [object("coin"), object("wallet")]) {
 }
 
 describe("composition editing", () => {
+  it("opens a regular selected frame and protects registered sources inside it", async () => {
+    const frame = { ...canvas(), ...metadata(), parent: { type: "PAGE", name: "Мои иллюстрации" } };
+    const postMessage = vi.fn();
+    vi.stubGlobal("figma", { currentPage: { selection: [frame] }, ui: { postMessage }, getNodeByIdAsync: async () => frame });
+    postSceneEditorState();
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ scene: expect.objectContaining({ id: frame.id }) }));
+    await expect(getEditableScene(frame.id)).resolves.toBe(frame);
+    await expect(getEditableScene(frame.id, ["coin"])).rejects.toThrow(/исходный ресурс/);
+    expect(frame.getSharedPluginData("", "scene")).toBe("");
+  });
+
   it("refuses source library frames and foreign objects", async () => {
     const source = { ...canvas(), ...metadata(), parent: { type: "PAGE", name: "Библиотека компонентов" } };
     vi.stubGlobal("figma", { getNodeByIdAsync: async () => source });

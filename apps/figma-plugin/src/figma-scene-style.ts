@@ -21,7 +21,8 @@ export function setSceneBackground(scene: FrameNode, choice: unknown, palette: C
   const fills: Paint[] = choice === "transparent" ? [] : [{ type: "SOLID", color: {
     r: parseInt(hex.slice(1, 3), 16) / 255, g: parseInt(hex.slice(3, 5), 16) / 255, b: parseInt(hex.slice(5, 7), 16) / 255
   } }];
-  applyBackground(scene, fills, palette);
+  const content = scene.children.find(node => node.id === scene.getSharedPluginData(namespace, "template-content"));
+  applyBackground(content?.type === "FRAME" ? content : scene, fills, palette);
 }
 
 function applyBackground(frame: FrameNode, fills: readonly Paint[], palette: ColorPalette): void {
@@ -44,6 +45,49 @@ export async function applyReferenceStyle(
   if (!style) throw new Error("Выберите исходный пример оформления.");
   const source = await figma.getNodeByIdAsync(style.id);
   if (source?.type !== "FRAME" || !Array.isArray(source.fills)) throw new Error("Фон примера недоступен.");
+  copyReferenceStyle(scene, source, mode, palette);
+}
+
+export async function addAutomaticDecoration(scene: FrameNode, paletteSourceIds: readonly string[], palette: ColorPalette): Promise<void> {
+  const { templates } = await discoverExampleTemplates(paletteSourceIds);
+  const foreground = scene.children.flatMap(node => node.absoluteBoundingBox ? [node.absoluteBoundingBox] : []);
+  const canvas = scene.absoluteBoundingBox;
+  if (!canvas) return;
+  let best: { source: FrameNode; score: number } | undefined;
+  for (const template of templates) {
+    const source = await figma.getNodeByIdAsync(template.sourceNodeId);
+    if (source?.type !== "FRAME") continue;
+    const sourceBounds = source.absoluteBoundingBox;
+    if (!sourceBounds) continue;
+    const { scale, offsetX, offsetY } = decorationFit(scene, source);
+    const marks = referenceDecor(source).flatMap(node => node.type === "LINE" ? [node] :
+      node.findAll(child => child.visible && !("children" in child)));
+    if (!marks.length) continue;
+    const visible = marks.filter(mark => {
+      const bounds = mark.absoluteBoundingBox;
+      if (!bounds) return false;
+      // Sample along long marks as well as at their centers.
+      return [0.2, 0.5, 0.8].filter(fraction => {
+        const x = canvas.x + offsetX + (bounds.x - sourceBounds.x + bounds.width * fraction) * scale;
+        const y = canvas.y + offsetY + (bounds.y - sourceBounds.y + bounds.height * fraction) * scale;
+        return x >= canvas.x && x <= canvas.x + canvas.width && y >= canvas.y && y <= canvas.y + canvas.height &&
+          !foreground.some(box => x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height);
+      }).length >= 2;
+    }).length;
+    if (visible / marks.length < 0.5) continue;
+    const formatDistance = Math.abs(Math.log(source.width / source.height / (scene.width / scene.height)));
+    const score = visible / marks.length - formatDistance * 0.8 + Math.min(visible, 5) * 0.12;
+    if (!best || score > best.score) best = { source, score };
+  }
+  if (best) copyReferenceStyle(scene, best.source, "decor", palette);
+}
+
+function decorationFit(scene: FrameNode, source: FrameNode) {
+  const scale = Math.min(scene.width / source.width, scene.height / source.height);
+  return { scale, offsetX: (scene.width - source.width * scale) / 2, offsetY: (scene.height - source.height * scale) / 2 };
+}
+
+function copyReferenceStyle(scene: FrameNode, source: FrameNode, mode: "both" | "background" | "decor", palette: ColorPalette): void {
   const layers = mode === "background" ? [] : referenceDecor(source);
   if (mode === "decor" && !layers.length) throw new Error("В этом примере нет отдельного декора.");
   const previous = mode === "background" ? [] : scene.children.filter(node => node.getSharedPluginData(namespace, "reference-decor") === "1");
@@ -59,9 +103,7 @@ export async function applyReferenceStyle(
       scene.insertChild(0, decor);
       decor.x = 0;
       decor.y = 0;
-      const scale = Math.min(scene.width / source.width, scene.height / source.height);
-      const offsetX = (scene.width - source.width * scale) / 2;
-      const offsetY = (scene.height - source.height * scale) / 2;
+      const { scale, offsetX, offsetY } = decorationFit(scene, source);
       for (const layer of layers) {
         assertVectorContent(layer);
         const copy = layer.clone();
@@ -72,7 +114,7 @@ export async function applyReferenceStyle(
       }
       new FigmaPaletteAdapter().apply(decor, palette);
     }
-    if (mode !== "decor") applyBackground(scene, source.fills, palette);
+    if (mode !== "decor" && Array.isArray(source.fills)) applyBackground(scene, source.fills, palette);
     for (const node of previous) node.remove();
   } catch (error) {
     decor?.remove();

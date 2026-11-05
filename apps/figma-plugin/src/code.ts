@@ -30,6 +30,7 @@ import type { RegistryDocument } from "./figma-registry-store.js";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
 import { planAutomaticScene } from "./automatic-scene-planner.js";
+import { addAutomaticDecoration } from "./figma-scene-style.js";
 import { handleTemplateMessage } from "./template-messages.js";
 import { requestCompositionAdjustment } from "./composition-adjustments.js";
 import { postNamedCompositionResolution } from "./named-composition.js";
@@ -618,6 +619,13 @@ async function main(): Promise<void> {
         palette
       );
 
+      if (automatic) {
+        try {
+          await addAutomaticDecoration(frame, paletteSourceNodeIds(state.palettes), palette);
+        } catch (error) {
+          console.warn("Не удалось добавить автоматический декор", error);
+        }
+      }
       figma.viewport.scrollAndZoomIntoView([frame]);
 
       figma.ui.postMessage({

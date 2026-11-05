@@ -82,6 +82,7 @@
   <div class="tabs">
     <button id="tab-compose" class="current">Композиция</button>
     <button id="tab-templates">Шаблоны</button>
+    <button id="tab-edit">Редактор</button>
     <button id="tab-library">Библиотека</button>
     <button id="tab-palettes">Палитры</button>
   </div>
@@ -89,9 +90,10 @@
   <div class="section-intro"><h1 id="section-title">Новая композиция</h1><p id="section-help">Подберите предметы по названиям или теме.</p></div>
   <main id="workspace">
 
-  <section id="compose">
+  <section id="edit" hidden>
+    <p id="scene-empty" class="muted">Выберите на холсте фрейм или предмет внутри композиции.</p>
     <details id="scene-editor" hidden open>
-      <summary>Редактировать композицию на холсте</summary>
+      <summary>Выбранная композиция</summary>
       <p id="scene-info" class="muted"></p>
       <label for="scene-object">Предмет на холсте</label>
       <select id="scene-object"></select>
@@ -153,7 +155,9 @@
       </details>
       <p class="muted">Изменения можно отменить в Figma: Ctrl+Z.</p>
     </details>
-    <h3 id="compose-new-title" hidden>Новая композиция</h3>
+  </section>
+
+  <section id="compose">
     <label for="compose-mode">Как собрать композицию</label>
     <select id="compose-mode">
       <option value="metaphor">По метафоре / заголовку</option>
@@ -397,6 +401,7 @@
     const sectionCopy = {
       templates: ["Вариация шаблона", "Готовая расстановка. Замените предметы и выберите цвета."],
       compose: ["Новая композиция", "Подберите предметы по названиям или теме."],
+      edit: ["Редактирование", "Меняйте предметы, оформление и размер выбранного фрейма."],
       library: ["Библиотека предметов", "Предметы для сцен и их варианты. Здесь можно добавить свои."],
       palettes: ["Цветовые схемы", "Палитра меняет цвета всей сцены. Здесь можно добавить свою."]
     };
@@ -593,9 +598,10 @@
       if (previous && options.some(item => item.value === previous)) select.value = previous;
     }
 
+    const tabs = ["compose", "templates", "edit", "library", "palettes"];
     function displayTab(name) {
       if (pendingAdjustment) cancelAdjustment();
-      for (const tab of ["compose", "templates", "library", "palettes"]) {
+      for (const tab of tabs) {
         element(tab).hidden = tab !== name;
         element(`tab-${tab}`).classList.toggle("current", tab === name);
         element(`tab-${tab}`).setAttribute("role", "tab");
@@ -608,13 +614,15 @@
       element("workspace").scrollTop = 0;
       ui.create.hidden = name !== "compose";
       element("template-create").hidden = name !== "templates";
-      element("action-bar").hidden = name !== "compose" && name !== "templates";
-      element("svg-export").hidden = name !== "compose" && name !== "templates";
+      element("action-bar").hidden = !["compose", "templates", "edit"].includes(name);
+      element("svg-export").hidden = name !== "edit";
       if (name === "templates" && !templateCatalogLoaded) send({ type: "template-list" });
+      if (name === "edit") send({ type: "scene-state" });
     }
     element("tab-compose").onclick = () => displayTab("compose");
     element("tab-library").onclick = () => displayTab("library");
     element("tab-templates").onclick = () => displayTab("templates");
+    element("tab-edit").onclick = () => displayTab("edit");
     element("tab-palettes").onclick = () => displayTab("palettes");
     element("palette-from-figma").onclick = () => {
       ui.kind.value = "palette";
@@ -625,7 +633,6 @@
     document.querySelector(".tabs").setAttribute("role", "tablist");
     document.querySelector(".tabs").setAttribute("aria-label", "Разделы студии");
     document.querySelector(".tabs").onkeydown = event => {
-      const tabs = ["compose", "templates", "library", "palettes"];
       const index = tabs.findIndex(tab => event.target.id === `tab-${tab}`);
       if (index < 0 || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
@@ -979,25 +986,23 @@
           const previousId = editingScene?.id;
           editingScene = message.scene;
           element("scene-editor").hidden = !editingScene;
-          element("compose-new-title").hidden = !editingScene;
-          ui.create.textContent = editingScene ? "Создать новую композицию" : "Создать композицию";
+          element("scene-empty").hidden = Boolean(editingScene);
           if (!editingScene) break;
-          element("scene-style").hidden = editingScene.isTemplate;
+          element("scene-reference-controls").hidden = editingScene.isTemplate;
           if (previousId !== editingScene.id && !editingScene.isTemplate && element("scene-style").open) send({ type: "scene-style-list" });
           element("scene-info").textContent = `${editingScene.name} · ${Math.round(editingScene.width)} × ${Math.round(editingScene.height)}`;
           const previousObject = element("scene-object").value;
           fillSelect(element("scene-object"), editingScene.items.map(item => ({ value: item.id, label: item.name })));
           if (editingScene.selectedId) element("scene-object").value = editingScene.selectedId;
-          else if (editingScene.items.some(item => item.id === previousObject)) element("scene-object").value = previousObject;
+          else if (previousId === editingScene.id && editingScene.items.some(item => item.id === previousObject)) element("scene-object").value = previousObject;
+          else element("scene-object").value = editingScene.items.find(item => item.role === "main")?.id ?? editingScene.items[0]?.id ?? "";
           element("scene-width").value = Math.round(editingScene.width);
           element("scene-height").value = Math.round(editingScene.height);
-          if (editingScene.paletteId && Array.from(element("scene-palette").options).some(option => option.value === editingScene.paletteId)) {
-            element("scene-palette").value = editingScene.paletteId;
-          }
+          element("scene-palette").value = editingScene.paletteId || "original";
           showSceneObject();
           if (previousId !== editingScene.id) {
             element("scene-editor").open = true;
-            element("scene-editor").scrollIntoView({ block: "start" });
+            if (!element("edit").hidden) element("workspace").scrollTop = 0;
           }
           break;
         }
@@ -1159,6 +1164,10 @@
           element("template-create").disabled = !element("template-select").value;
           ui.status.textContent = "Композиция создана";
           send({ type: "scene-state" });
+          break;
+        case "scene-new-created":
+          displayTab("edit");
+          element("tab-edit").focus();
           break;
         case "error":
           if (message.operation === "import-palette") {

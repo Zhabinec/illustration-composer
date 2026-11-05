@@ -26,7 +26,16 @@ function score(placements: readonly Placement[], width: number, height: number):
   const primary = placements[0]!;
   const primaryBalance = Math.hypot((primary.x + primary.width / 2) / width - 0.5,
     (primary.y + primary.height / 2) / height - 0.5);
-  return area / (width * height) * 3 - balance * 2 - whitespace * 1.2 - primaryBalance * 0.35;
+  const accents = placements.slice(1);
+  const rhythm = accents.reduce((sum, item) => {
+    const dx = (item.x + item.width / 2 - primary.x - primary.width / 2) / width;
+    const dy = (item.y + item.height / 2 - primary.y - primary.height / 2) / height;
+    const diagonal = Math.min(Math.abs(dx), Math.abs(dy), 0.14);
+    const gapX = Math.max(0, Math.abs(dx) - (primary.width + item.width) / (2 * width));
+    const gapY = Math.max(0, Math.abs(dy) - (primary.height + item.height) / (2 * height));
+    return sum + diagonal - Math.hypot(gapX, gapY) * 2;
+  }, 0) / Math.max(1, accents.length);
+  return area / (width * height) * 3 - balance * 2 - whitespace * 0.7 - primaryBalance * 0.35 + rhythm * 1.6;
 }
 
 function fit(source: CompositionSource, index: number, width: number, height: number): Placement {
@@ -68,7 +77,7 @@ function foregroundCandidates(
         const next: Placement[][] = [];
         for (const ratio of [1, 0.84]) {
           const secondary = fit(source, index, width * 0.42 / density * ratio, height * 0.42 / density * ratio);
-          const areaLimit = Math.sqrt(main.width * main.height * 0.62 / (secondary.width * secondary.height));
+          const areaLimit = Math.sqrt(main.width * main.height * 0.55 / (secondary.width * secondary.height));
           const reduction = Math.min(1, areaLimit);
           secondary.width *= reduction;
           secondary.height *= reduction;
