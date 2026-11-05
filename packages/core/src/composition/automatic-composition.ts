@@ -57,6 +57,21 @@ function separate(a: Box, b: Box, gap: number): boolean {
     a.y + a.height + gap <= b.y || b.y + b.height + gap <= a.y;
 }
 
+function nearPrimary(box: Placement, primary: Placement, gap: number): Placement[] {
+  const result: Placement[] = [];
+  for (const offset of [-0.3, 0, 0.3]) {
+    const x = primary.x + (primary.width - box.width) / 2 + primary.width * offset;
+    const y = primary.y + (primary.height - box.height) / 2 + primary.height * offset;
+    result.push(
+      { ...box, x, y: primary.y - box.height - gap },
+      { ...box, x, y: primary.y + primary.height + gap },
+      { ...box, x: primary.x - box.width - gap, y },
+      { ...box, x: primary.x + primary.width + gap, y }
+    );
+  }
+  return result;
+}
+
 function foregroundCandidates(
   width: number, height: number, sources: readonly CompositionSource[], indices: readonly number[]
 ): Placement[][] {
@@ -82,13 +97,17 @@ function foregroundCandidates(
           secondary.width *= reduction;
           secondary.height *= reduction;
           secondary.scale *= reduction;
-          for (const placement of positions(secondary, width, height, margin)) {
+          const nearby = nearPrimary(secondary, start, gap).filter(item =>
+            item.x >= margin && item.y >= margin &&
+            item.x + item.width <= width - margin && item.y + item.height <= height - margin);
+          for (const placement of [...nearby, ...positions(secondary, width, height, margin)]) {
             for (const placed of beam) if (placed.every(item => separate(item, placement, gap))) {
               next.push([...placed, placement]);
             }
           }
         }
-        beam = next.sort((a, b) => score(b, width, height) - score(a, width, height)).slice(0, 6);
+        beam = next.map(items => ({ items, score: score(items, width, height) }))
+          .sort((a, b) => b.score - a.score).slice(0, 6).map(entry => entry.items);
         if (!beam.length) break;
       }
       candidates.push(...beam.filter(items => items.length === indices.length));
