@@ -70,7 +70,7 @@ npm run test -w @illustration-composer/figma-plugin
 npm run build -w @illustration-composer/figma-plugin
 ```
 
-`manifest.json` указывает на `dist/code.js` и `src/ui.html`; esbuild собирает точку входа в IIFE. Сам HTML не собирается esbuild и открывается Figma по пути из манифеста.
+`manifest.json` указывает на `dist/code.js` и `dist/ui.html`. Сборка встраивает модули из `src/ui/` в шаблон `src/ui.html`. Точка входа подключает только присутствующие окна.
 
 ## 3. Текущее состояние (не путать с планом)
 

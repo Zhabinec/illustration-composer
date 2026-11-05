@@ -9,10 +9,9 @@ const artifacts = join(root, "artifacts");
 const folder = join(artifacts, `package-${randomUUID()}`, "Illustration Composer");
 const archive = join(artifacts, "illustration-composer-plugin.zip");
 mkdirSync(join(folder, "dist"), { recursive: true });
-mkdirSync(join(folder, "src"), { recursive: true });
 copyFileSync(join(root, "apps/figma-plugin/manifest.json"), join(folder, "manifest.json"));
 copyFileSync(join(root, "apps/figma-plugin/dist/code.js"), join(folder, "dist/code.js"));
-copyFileSync(join(root, "apps/figma-plugin/src/ui.html"), join(folder, "src/ui.html"));
+copyFileSync(join(root, "apps/figma-plugin/dist/ui.html"), join(folder, "dist/ui.html"));
 cpSync(join(root, "docs"), join(folder, "docs"), { recursive: true });
 writeFileSync(join(folder, "README.md"), `# Illustration Composer — готовый Figma-плагин
 

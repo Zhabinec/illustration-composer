@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
-    "build": "esbuild src/code.ts --bundle --platform=browser --target=es2020 --format=iife --outfile=dist/code.js",
+    "build": "esbuild src/code.ts --bundle --platform=browser --target=es2020 --format=iife --outfile=dist/code.js && node build-ui.mjs",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],
