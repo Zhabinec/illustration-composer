@@ -6,8 +6,10 @@ import { assertVectorContent } from "./figma-vector-composition.js";
 import { FigmaPaletteAdapter } from "./figma-palette-adapter.js";
 
 const namespace = "illustrationComposer";
+type DecorationLayer = LineNode | GroupNode | FrameNode;
+interface DecorationFit { scale: number; offsetX: number; offsetY: number }
 
-export function referenceDecor(source: FrameNode): (LineNode | GroupNode | FrameNode)[] {
+export function referenceDecor(source: FrameNode): DecorationLayer[] {
   const named = new Set(getTemplateSlots(source).filter(slot => slot.kind === "decoration").map(slot => slot.id));
   return source.children.filter((node): node is LineNode | GroupNode | FrameNode => node.visible &&
     (node.type === "LINE" || ((node.type === "GROUP" || node.type === "FRAME") && named.has(node.id))) && !node.isMask);
@@ -53,42 +55,62 @@ export async function addAutomaticDecoration(scene: FrameNode, paletteSourceIds:
   const foreground = scene.children.flatMap(node => node.absoluteBoundingBox ? [node.absoluteBoundingBox] : []);
   const canvas = scene.absoluteBoundingBox;
   if (!canvas) return;
-  let best: { source: FrameNode; score: number } | undefined;
+  let best: { source: FrameNode; layers: DecorationLayer[]; fit: DecorationFit; score: number } | undefined;
   for (const template of templates) {
     const source = await figma.getNodeByIdAsync(template.sourceNodeId);
     if (source?.type !== "FRAME") continue;
     const sourceBounds = source.absoluteBoundingBox;
     if (!sourceBounds) continue;
-    const { scale, offsetX, offsetY } = decorationFit(scene, source);
-    const marks = referenceDecor(source).flatMap(node => node.type === "LINE" ? [node] :
-      node.findAll(child => child.visible && !("children" in child)));
-    if (!marks.length) continue;
-    const visible = marks.filter(mark => {
-      const bounds = mark.absoluteBoundingBox;
-      if (!bounds) return false;
-      // Sample along long marks as well as at their centers.
-      return [0.2, 0.5, 0.8].filter(fraction => {
-        const x = canvas.x + offsetX + (bounds.x - sourceBounds.x + bounds.width * fraction) * scale;
-        const y = canvas.y + offsetY + (bounds.y - sourceBounds.y + bounds.height * fraction) * scale;
-        return x >= canvas.x && x <= canvas.x + canvas.width && y >= canvas.y && y <= canvas.y + canvas.height &&
-          !foreground.some(box => x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height);
-      }).length >= 2;
-    }).length;
-    if (visible / marks.length < 0.5) continue;
+    const layers = referenceDecor(source);
+    if (!layers.length) continue;
     const formatDistance = Math.abs(Math.log(source.width / source.height / (scene.width / scene.height)));
-    const score = visible / marks.length - formatDistance * 0.8 + Math.min(visible, 5) * 0.12;
-    if (!best || score > best.score) best = { source, score };
+    const samples = layers.map(layer => ({ layer, points: decorationSamples(layer) }));
+    for (const factor of [1, 0.82]) {
+      const fit = decorationFit(scene, source, factor);
+      for (const [dx, dy] of [[0, 0], [-0.12, 0], [0.12, 0], [0, -0.12], [0, 0.12]]) {
+        const placement = { ...fit, offsetX: fit.offsetX + dx! * scene.width, offsetY: fit.offsetY + dy! * scene.height };
+        const visible = samples.flatMap(({ layer, points }) => {
+          const count = points.filter(point => {
+            const x = canvas.x + placement.offsetX + (point.x - sourceBounds.x) * placement.scale;
+            const y = canvas.y + placement.offsetY + (point.y - sourceBounds.y) * placement.scale;
+            return x >= canvas.x && x <= canvas.x + canvas.width && y >= canvas.y && y <= canvas.y + canvas.height &&
+              !foreground.some(box => x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height);
+          }).length;
+          return count && count / points.length >= 0.6 ? [{ layer, visibility: count / points.length }] : [];
+        });
+        if (!visible.length) continue;
+        const score = visible.reduce((sum, item) => sum + item.visibility, 0) / visible.length +
+          Math.min(visible.length, 4) * 0.25 - formatDistance * 0.45 -
+          (1 - factor) * 0.45 - Math.hypot(dx!, dy!) * 0.5;
+        if (!best || score > best.score) best = { source, layers: visible.map(item => item.layer), fit: placement, score };
+      }
+    }
   }
-  if (best) copyReferenceStyle(scene, best.source, "decor", palette);
+  if (best) copyReferenceStyle(scene, best.source, "decor", palette, best.layers, best.fit);
 }
 
-function decorationFit(scene: FrameNode, source: FrameNode) {
-  const scale = Math.min(scene.width / source.width, scene.height / source.height);
+function decorationSamples(layer: DecorationLayer): { x: number; y: number }[] {
+  if (layer.type === "LINE") {
+    const [[a, , x], [b, , y]] = layer.absoluteTransform;
+    return [0.1, 0.3, 0.5, 0.7, 0.9].map(fraction => ({
+      x: x + a * layer.width * fraction, y: y + b * layer.width * fraction
+    }));
+  }
+  return layer.findAll(child => child.visible && !("children" in child)).flatMap(child => {
+    const box = child.absoluteBoundingBox;
+    return box ? [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] : [];
+  });
+}
+
+function decorationFit(scene: FrameNode, source: FrameNode, factor = 1): DecorationFit {
+  const scale = Math.min(scene.width / source.width, scene.height / source.height) * factor;
   return { scale, offsetX: (scene.width - source.width * scale) / 2, offsetY: (scene.height - source.height * scale) / 2 };
 }
 
-function copyReferenceStyle(scene: FrameNode, source: FrameNode, mode: "both" | "background" | "decor", palette: ColorPalette): void {
-  const layers = mode === "background" ? [] : referenceDecor(source);
+function copyReferenceStyle(
+  scene: FrameNode, source: FrameNode, mode: "both" | "background" | "decor", palette: ColorPalette,
+  layers = mode === "background" ? [] : referenceDecor(source), fit = decorationFit(scene, source)
+): void {
   if (mode === "decor" && !layers.length) throw new Error("В этом примере нет отдельного декора.");
   const previous = mode === "background" ? [] : scene.children.filter(node => node.getSharedPluginData(namespace, "reference-decor") === "1");
   const decor = layers.length ? figma.createFrame() : null;
@@ -103,7 +125,7 @@ function copyReferenceStyle(scene: FrameNode, source: FrameNode, mode: "both" | 
       scene.insertChild(0, decor);
       decor.x = 0;
       decor.y = 0;
-      const { scale, offsetX, offsetY } = decorationFit(scene, source);
+      const { scale, offsetX, offsetY } = fit;
       for (const layer of layers) {
         assertVectorContent(layer);
         const copy = layer.clone();
