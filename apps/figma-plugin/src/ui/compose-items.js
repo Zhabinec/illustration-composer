@@ -116,6 +116,8 @@ export function mountCompositionItems(send, dimensions) {
       help.textContent = "Рисунок можно выбрать по миниатюре. Слой задаётся отдельно.";
       const position = placementFields(dimensions);
       const scale = numberField("Размер от автоматического, %", "100", 25);
+      const width = numberField("Точная ширина, px", "", 1, undefined, "По масштабу");
+      width.input.oninput = () => { scale.input.disabled = width.input.value !== ""; };
       const rotation = numberField("Поворот, °", "0", -180, 180);
       const transform = document.createElement("div");
       transform.className = "inline";
@@ -123,11 +125,11 @@ export function mountCompositionItems(send, dimensions) {
       const coordinates = document.createElement("details");
       const coordinatesLabel = document.createElement("summary");
       coordinatesLabel.textContent = "Точное положение в пикселях";
-      coordinates.append(coordinatesLabel, position.row);
+      coordinates.append(coordinatesLabel, position.row, width.label);
       card.append(heading, variantLabel, thumbnail, help, layerLabel, priority.label, priorityHelp, position.label, transform, coordinates);
       root.appendChild(card);
       cards.push({ asset, item, heading, variant, layer, priority: priority.input, card, preview, thumbnail, coordinates,
-        x: position.x, y: position.y, scale: scale.input, rotation: rotation.input });
+        x: position.x, y: position.y, width: width.input, scale: scale.input, rotation: rotation.input });
     });
     fillSelect(primary, cards.length ? cards.map(({ asset }, index) => ({ value: String(index), label: asset.name }))
       : [{ value: "", label: "Выбрать автоматически" }], false);
@@ -136,12 +138,13 @@ export function mountCompositionItems(send, dimensions) {
 
   function read() {
     const settings = [];
-    for (const { asset, variant, layer, priority, x, y, scale, rotation } of cards) {
-      if (!variant.value || ![x, y, scale, rotation, priority].every(input => input.reportValidity())) return null;
+    for (const { asset, variant, layer, priority, x, y, width, scale, rotation } of cards) {
+      if (!variant.value || ![x, y, width, scale, rotation, priority].every(input => input.reportValidity())) return null;
       settings.push({ assetId: asset.id, variantId: variant.value, layer: layer.value === "background" ? "background" : "main",
         layerPriority: priority.value === "" ? undefined : Number(priority.value),
         x: x.value === "" ? undefined : Number(x.value), y: y.value === "" ? undefined : Number(y.value),
-        scale: Number(scale.value || 100), rotation: Number(rotation.value || 0) });
+        width: width.value === "" ? undefined : Number(width.value),
+        scale: scale.disabled ? 100 : Number(scale.value || 100), rotation: Number(rotation.value || 0) });
     }
     return { itemSettings: settings, primaryIndex: Number(primary.value) };
   }

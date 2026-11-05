@@ -7,6 +7,7 @@ export interface CompositionItemSettings {
   layerPriority?: number;
   x?: number;
   y?: number;
+  width?: number;
   scale: number;
   rotation: number;
 }
@@ -17,9 +18,9 @@ export function readCompositionItemSettings(value: unknown): CompositionItemSett
   return value.map((item: unknown) => {
     if (!item || typeof item !== "object" || !("assetId" in item) || typeof item.assetId !== "string" ||
       !("variantId" in item) || typeof item.variantId !== "string") throw new Error("Выберите вариант предмета из библиотеки.");
-    const number = (key: "x" | "y" | "scale" | "rotation" | "layerPriority", min: number, max = Infinity) => {
+    const number = (key: "x" | "y" | "width" | "scale" | "rotation" | "layerPriority", min: number, max = Infinity) => {
       const input = (item as Record<string, unknown>)[key];
-      if (input === undefined && (key === "x" || key === "y" || key === "layerPriority")) return undefined;
+      if (input === undefined && (key === "x" || key === "y" || key === "width" || key === "layerPriority")) return undefined;
       if (typeof input !== "number" || !Number.isFinite(input) || input < min || input > max) {
         throw new Error("Проверьте положение, масштаб и угол предмета.");
       }
@@ -27,12 +28,14 @@ export function readCompositionItemSettings(value: unknown): CompositionItemSett
     };
     const x = number("x", -10000, 10000);
     const y = number("y", -10000, 10000);
+    const width = number("width", 1);
     const layerPriority = number("layerPriority", -10000, 10000);
     const layer = "layer" in item ? item.layer : undefined;
     if (layer !== undefined && layer !== "main" && layer !== "background") throw new Error("Выберите слой предмета.");
     return { assetId: item.assetId, variantId: item.variantId, ...(layer === undefined ? {} : { layer }),
       ...(layerPriority === undefined ? {} : { layerPriority }), ...(x === undefined ? {} : { x }),
-      ...(y === undefined ? {} : { y }), scale: number("scale", 25)!, rotation: number("rotation", -180, 180)! };
+      ...(y === undefined ? {} : { y }), ...(width === undefined ? {} : { width }),
+      scale: number("scale", 25)!, rotation: number("rotation", -180, 180)! };
   });
 }
 
@@ -44,9 +47,10 @@ export function applyCompositionItemSettings(
     const setting = settings[index]!;
     const variant = setting.layer ? { ...item.variant, role: setting.layer } : item.variant;
     const layered = { ...item, variant, ...(setting.layerPriority === undefined ? {} : { layerPriority: setting.layerPriority }) };
-    if (setting.x === undefined && setting.y === undefined && setting.scale === 100 && setting.rotation === 0) return layered;
+    if (setting.x === undefined && setting.y === undefined && setting.width === undefined &&
+        setting.scale === 100 && setting.rotation === 0) return layered;
     const source = sources[index]!;
-    const scale = item.scale * setting.scale / 100;
+    const scale = setting.width === undefined ? item.scale * setting.scale / 100 : setting.width / source.width;
     const centerX = item.x + source.width * item.scale / 2;
     const centerY = item.y + source.height * item.scale / 2;
     const angle = setting.rotation * Math.PI / 180;

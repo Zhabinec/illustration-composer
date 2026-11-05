@@ -9,7 +9,7 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
     format: element("format"),
     palette: element("palette"),
     create: element("create") };
-  const dimensions = () => ({ landscape: [1200, 800], square: [1000, 1000], portrait: [800, 1200] }[ui.format.value]);
+  const dimensions = () => ({ landscape: [1200, 800], wide: [1200, 630], square: [1000, 1000], portrait: [800, 1200] }[ui.format.value]);
   const items = mountCompositionItems(send, dimensions);
   let assets = [];
   let previewRequestId = 0;

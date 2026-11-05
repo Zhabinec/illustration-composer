@@ -17,3 +17,14 @@ it("keeps exact Figma coordinates when scaling and rotating another occurrence",
   expect(result.items[1]!.x).toBe(25);
   expect(result.items[1]!.y).toBe(75);
 });
+
+it("uses the specified width and keeps an intentional crop outside the frame", () => {
+  const source = { assetId: AssetId.create("vase"), variant: { resourceKey: "vase", role: "background", size: "L" } as const,
+    width: 400, height: 600 };
+  const item = { assetId: source.assetId, variant: source.variant, x: 0, y: 0, scale: 0.5, rotation: 0 };
+  const settings = readCompositionItemSettings([
+    { assetId: "vase", variantId: "vase-l", x: 320, y: -125, width: 600, scale: 100, rotation: 0 }
+  ]);
+  expect(applyCompositionItemSettings({ width: 800, height: 1200, items: [item] }, [source], settings).items[0])
+    .toMatchObject({ x: 320, y: -125, scale: 1.5 });
+});

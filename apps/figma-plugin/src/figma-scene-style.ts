@@ -6,13 +6,28 @@ import { assertVectorContent } from "./figma-vector-composition.js";
 import { FigmaPaletteAdapter } from "./figma-palette-adapter.js";
 
 const namespace = "illustrationComposer";
-type DecorationLayer = LineNode | GroupNode | FrameNode;
+type DecorationLayer = LineNode | GroupNode | FrameNode | EllipseNode | VectorNode;
 interface DecorationFit { scale: number; offsetX: number; offsetY: number }
 
 export function referenceDecor(source: FrameNode): DecorationLayer[] {
   const named = new Set(getTemplateSlots(source).filter(slot => slot.kind === "decoration").map(slot => slot.id));
-  return source.children.filter((node): node is LineNode | GroupNode | FrameNode => node.visible &&
-    (node.type === "LINE" || ((node.type === "GROUP" || node.type === "FRAME") && named.has(node.id))) && !node.isMask);
+  const small = (node: SceneNode) => node.width <= source.width * 0.14 && node.height <= source.height * 0.14;
+  return source.children.filter((node): node is DecorationLayer => node.visible && "isMask" in node && !node.isMask &&
+    (node.type === "LINE" || node.type === "ELLIPSE" ||
+      (node.type === "VECTOR" && (isDecorationLine(node) || small(node))) ||
+      ((node.type === "GROUP" || node.type === "FRAME") && named.has(node.id)) ||
+      (node.type === "GROUP" && /^group(?:\s+\d+)?$/i.test(node.name.trim()) && small(node) &&
+        node.children.length > 1 && node.children.every(child => child.type === "ELLIPSE" || child.type === "VECTOR"))));
+}
+
+function isDecorationLine(node: DecorationLayer): boolean {
+  return node.type === "LINE" || (node.type === "VECTOR" && /^(line|линия)(?:\s+\d+)?$/i.test(node.name.trim()));
+}
+
+export function decorationLabel(node: DecorationLayer): { type: string; name: string } {
+  if (isDecorationLine(node)) return { type: "Линии", name: "Линия" };
+  if (node.type === "ELLIPSE" || node.type === "VECTOR") return { type: "Точки", name: "Точка" };
+  return { type: "Конфетти", name: "Конфетти" };
 }
 
 export function setSceneBackground(scene: FrameNode, choice: unknown, palette: ColorPalette): void {
@@ -147,11 +162,15 @@ export async function addAutomaticDecoration(scene: FrameNode, paletteSourceIds:
 }
 
 function decorationSamples(layer: DecorationLayer): { x: number; y: number }[] {
-  if (layer.type === "LINE") {
+  if (isDecorationLine(layer)) {
     const [[a, , x], [b, , y]] = layer.absoluteTransform;
     return [0.1, 0.3, 0.5, 0.7, 0.9].map(fraction => ({
       x: x + a * layer.width * fraction, y: y + b * layer.width * fraction
     }));
+  }
+  if (!("findAll" in layer)) {
+    const box = layer.absoluteBoundingBox;
+    return box ? [{ x: box.x + box.width / 2, y: box.y + box.height / 2 }] : [];
   }
   return layer.findAll(child => child.visible && !("children" in child)).flatMap(child => {
     const box = child.absoluteBoundingBox;

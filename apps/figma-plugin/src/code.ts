@@ -31,7 +31,7 @@ import type { RegistryDocument } from "./figma-registry-store.js";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
 import { planAutomaticScene } from "./automatic-scene-planner.js";
-import { addAutomaticDecoration, addChosenDecoration, applyReferenceStyle, referenceDecor, setSceneBackground } from "./figma-scene-style.js";
+import { addAutomaticDecoration, addChosenDecoration, applyReferenceStyle, decorationLabel, referenceDecor, setSceneBackground } from "./figma-scene-style.js";
 import { applyCompositionItemSettings, readCompositionItemSettings } from "./composition-item-settings.js";
 import { discoverExampleTemplates } from "./figma-example-templates.js";
 import { handleTemplateMessage } from "./template-messages.js";
@@ -45,6 +45,7 @@ import { postSceneEditorState, getEditableScene } from "./figma-scene-editor.js"
 
 const formats = {
   landscape: { width: 1200, height: 800 },
+  wide: { width: 1200, height: 630 },
   square: { width: 1000, height: 1000 },
   portrait: { width: 800, height: 1200 }
 } as const;
@@ -933,11 +934,11 @@ async function main(): Promise<void> {
               const source = await figma.getNodeByIdAsync(template.sourceNodeId);
               if (source?.type !== "FRAME") continue;
               for (const layer of referenceDecor(source)) {
-                const type = layer.type === "LINE" ? "Линии" : /конфетти|confetti/i.test(layer.name) ? "Конфетти" : "Украшения";
+                const { type, name } = decorationLabel(layer);
                 const number = (counts.get(type) ?? 0) + 1;
                 counts.set(type, number);
                 decorations.push({ id: layer.id, sourceId: source.id, type,
-                  name: `${layer.type === "LINE" ? "Линия" : layer.name} · ${number}` });
+                  name: `${name} · ${number}` });
               }
             }
             figma.ui.postMessage({ type: "compose-decoration-catalog", decorations });
