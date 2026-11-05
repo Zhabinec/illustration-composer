@@ -9,11 +9,11 @@ it("keeps exact Figma coordinates when scaling and rotating another occurrence",
   const second = { ...first, x: 200 };
   const settings = readCompositionItemSettings([
     { assetId: "pen", variantId: "pen-l", layer: "background", scale: 100, rotation: 0 },
-    { assetId: "pen", variantId: "pen-l", x: 25, y: 75, scale: 150, rotation: 90 }
+    { assetId: "pen", variantId: "pen-l", x: 25, y: 75, scale: 450, rotation: 90 }
   ]);
   const result = applyCompositionItemSettings({ width: 800, height: 400, items: [first, second] }, [source, source], settings);
   expect(result.items[0]).toEqual({ ...first, variant: { ...first.variant, role: "background" } });
-  expect(result.items[1]).toMatchObject({ scale: 1.5, rotation: 90 });
+  expect(result.items[1]).toMatchObject({ scale: 4.5, rotation: 90 });
   expect(result.items[1]!.x).toBe(25);
   expect(result.items[1]!.y).toBe(75);
 });

@@ -68,7 +68,7 @@ export async function addChosenDecoration(
     if (!entry || typeof entry !== "object" || typeof entry.sourceId !== "string" || typeof entry.layerId !== "string") {
       throw new Error("Выберите украшение из библиотеки.");
     }
-    const coordinate = (value: unknown, min: number, max: number) => {
+    const coordinate = (value: unknown, min: number, max = Infinity) => {
       if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
         throw new Error("Проверьте положение, масштаб и поворот декора.");
       }
@@ -91,7 +91,7 @@ export async function addChosenDecoration(
     const centerY = fit.offsetY + fit.scale * (y + b * layer.width / 2 + d * layer.height / 2);
     const positionX = entry.x === undefined ? undefined : coordinate(entry.x, -10000, 10000);
     const positionY = entry.y === undefined ? undefined : coordinate(entry.y, -10000, 10000);
-    const scale = fit.scale * coordinate(entry.scale, 25, 250) / 100;
+    const scale = fit.scale * (coordinate(entry.scale, 25) / 100);
     const rotation = coordinate(entry.rotation, -180, 180);
     const copy = layer.clone();
     scene.insertChild(index, copy);

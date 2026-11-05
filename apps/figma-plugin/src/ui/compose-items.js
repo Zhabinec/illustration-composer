@@ -7,7 +7,7 @@ export function numberField(labelText, value, min, max, placeholder) {
   input.type = "number";
   input.step = "any";
   input.min = String(min);
-  input.max = String(max);
+  if (max !== undefined) input.max = String(max);
   input.value = value;
   if (placeholder) input.placeholder = placeholder;
   label.appendChild(input);
@@ -115,7 +115,7 @@ export function mountCompositionItems(send, dimensions) {
       help.className = "muted";
       help.textContent = "Рисунок можно выбрать по миниатюре. Слой задаётся отдельно.";
       const position = placementFields(dimensions);
-      const scale = numberField("Размер от автоматического, %", "100", 25, 250);
+      const scale = numberField("Размер от автоматического, %", "100", 25);
       const rotation = numberField("Поворот, °", "0", -180, 180);
       const transform = document.createElement("div");
       transform.className = "inline";

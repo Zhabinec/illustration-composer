@@ -47,7 +47,7 @@ export function mountCompositionDecoration(send, dimensions, invalidatePreview) 
     thumbnail.hidden = !item.image;
     if (item.image) thumbnail.src = item.image;
     const position = placementFields(dimensions, "Как в примере");
-    const scale = numberField("Размер, %", "100", 25, 250);
+    const scale = numberField("Размер, %", "100", 25);
     const rotation = numberField("Поворот, °", "0", -180, 180);
     const transform = document.createElement("div");
     transform.className = "inline";

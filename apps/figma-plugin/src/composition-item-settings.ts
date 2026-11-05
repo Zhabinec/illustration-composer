@@ -17,7 +17,7 @@ export function readCompositionItemSettings(value: unknown): CompositionItemSett
   return value.map((item: unknown) => {
     if (!item || typeof item !== "object" || !("assetId" in item) || typeof item.assetId !== "string" ||
       !("variantId" in item) || typeof item.variantId !== "string") throw new Error("Выберите вариант предмета из библиотеки.");
-    const number = (key: "x" | "y" | "scale" | "rotation" | "layerPriority", min: number, max: number) => {
+    const number = (key: "x" | "y" | "scale" | "rotation" | "layerPriority", min: number, max = Infinity) => {
       const input = (item as Record<string, unknown>)[key];
       if (input === undefined && (key === "x" || key === "y" || key === "layerPriority")) return undefined;
       if (typeof input !== "number" || !Number.isFinite(input) || input < min || input > max) {
@@ -32,7 +32,7 @@ export function readCompositionItemSettings(value: unknown): CompositionItemSett
     if (layer !== undefined && layer !== "main" && layer !== "background") throw new Error("Выберите слой предмета.");
     return { assetId: item.assetId, variantId: item.variantId, ...(layer === undefined ? {} : { layer }),
       ...(layerPriority === undefined ? {} : { layerPriority }), ...(x === undefined ? {} : { x }),
-      ...(y === undefined ? {} : { y }), scale: number("scale", 25, 250)!, rotation: number("rotation", -180, 180)! };
+      ...(y === undefined ? {} : { y }), scale: number("scale", 25)!, rotation: number("rotation", -180, 180)! };
   });
 }
 
