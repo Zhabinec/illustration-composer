@@ -8,7 +8,7 @@ export class FigmaSceneRenderer {
 
   constructor(private readonly adapter: FigmaAssetAdapter) {}
 
-  async render(scene: CompositionScene, name: string, palette: ColorPalette): Promise<FrameNode> {
+  async render(scene: CompositionScene, name: string, palette: ColorPalette, select = true): Promise<FrameNode> {
     const page = figma.currentPage;
     const frame = figma.createFrame();
     try {
@@ -43,7 +43,7 @@ export class FigmaSceneRenderer {
         copy.setSharedPluginData("illustrationComposer", "composition-role", item.variant.role);
       }
       this.paletteAdapter.apply(frame, palette);
-      figma.currentPage.selection = [frame];
+      if (select) figma.currentPage.selection = [frame];
       return frame;
     } catch (error) {
       frame.remove();

@@ -58,6 +58,7 @@
     .palette-swatches { display: flex; gap: 4px; }
     .palette-swatches span { height: 24px; flex: 1; border-radius: 5px; border: 1px solid #00000014; }
     .preview { display: block; width: 140px; height: 116px; object-fit: contain; margin: 9px auto; background: var(--figma-color-bg-secondary, #fafafa); border-radius: 6px; }
+    #compose-preview-image, #compose-reference-image { width: 100%; height: auto; max-height: 320px; }
     .compare { display: flex; gap: 10px; }
     .compare > div { flex: 1; text-align: center; min-width: 0; }
     .compare img { width: 100%; height: 112px; object-fit: contain; background: var(--figma-color-bg-secondary, #fafafa); }
@@ -168,15 +169,15 @@
     <div id="metaphor-selection">
       <label for="metaphor-query">Метафора или заголовок</label>
       <textarea id="metaphor-query" rows="2" maxlength="500" placeholder="Финансовая безопасность" aria-describedby="metaphor-help metaphor-feedback"></textarea>
-      <p id="metaphor-help" class="muted">Введите тему и нажмите «Создать композицию». Предметы подберутся автоматически.</p>
+      <p id="metaphor-help" class="muted">Введите тему и создайте сцену сразу или сначала настройте подобранные предметы.</p>
       <details><summary>Как работает подбор</summary><p class="muted">Подбираем образы этой библиотеки: финансы, защита, знания, идеи, связь, команда, порядок и музыка. Можно вводить выражения вроде «Свет в конце тоннеля» или «Золотой запас». Если подходящих образов нет, попросим уточнить тему.</p></details>
-      <button id="metaphor-pick" style="width:100%">Посмотреть и изменить подбор</button>
+      <button id="metaphor-pick" style="width:100%">Подобрать и настроить предметы</button>
       <div id="metaphor-feedback" aria-live="polite"></div>
     </div>
     <div id="names-selection" hidden>
       <label for="object-names">Названия предметов</label>
       <textarea id="object-names" rows="3" maxlength="1000" placeholder="Монета, кошелёк, телефон" aria-describedby="names-help names-feedback"></textarea>
-      <p class="muted" id="names-help">До 8 предметов через запятую. Первый — главный.</p>
+      <p class="muted" id="names-help">До 8 предметов через запятую или с новой строки. У каждого найденного предмета появится своя карточка.</p>
       <div id="names-feedback" aria-live="polite"></div>
       <details><summary>Доступные названия</summary><p id="available-names" class="muted"></p></details>
     </div>
@@ -186,40 +187,45 @@
     <label for="secondary">Дополнительный объект</label>
     <select id="secondary"></select>
     </div>
+    <div id="compose-items"></div>
+    <h3>Расстановка</h3>
     <div class="inline">
       <div>
-        <label for="size">Рисунок</label>
-        <select id="size"><option value="L">Подробный</option><option value="S">Упрощённый</option></select>
-      </div>
-      <div>
-        <label for="secondary-role" id="secondary-role-label">Дополнительные предметы</label>
-        <select id="secondary-role">
-          <option value="auto">Подобрать роли</option>
-          <option value="main">С акцентом</option>
-          <option value="background">На фоне</option>
-        </select>
-      </div>
-    </div>
-    <div class="inline">
-      <div>
-        <label for="layout">Расстановка</label>
+        <label for="layout">Как расположить предметы</label>
         <select id="layout">
-          <option value="automatic">Автоматически</option>
-          <option value="focus">Акцент на главном</option>
-          <option value="row">В ряд</option>
+          <option value="automatic">Подобрать автоматически</option>
+          <option value="focus">Главный крупнее</option>
+          <option value="row">Слева направо</option>
         </select>
       </div>
       <div>
-        <label for="format">Формат</label>
-        <select id="format">
-          <option value="landscape">1200 × 800</option>
-          <option value="square">1000 × 1000</option>
-          <option value="portrait">800 × 1200</option>
-        </select>
+        <label for="compose-primary">Главный предмет</label>
+        <select id="compose-primary"><option value="">Выбрать автоматически</option></select>
       </div>
     </div>
-    <label for="palette">Палитра</label>
-    <select id="palette"></select>
+    <h3>Оформление</h3>
+    <div class="inline">
+      <label>Фон<select id="compose-background">
+        <option value="pale">Мягкий цвет палитры</option><option value="light">Насыщенный цвет палитры</option>
+        <option value="white">Белый</option><option value="transparent">Прозрачный</option><option value="reference">Из примера</option>
+      </select></label>
+      <label>Декор<select id="compose-decoration">
+        <option value="auto">Подобрать линии и украшения</option><option value="reference">Взять из примера</option><option value="none">Без декора</option>
+      </select></label>
+    </div>
+    <div id="compose-example-panel" hidden>
+      <label for="compose-reference">Авторский пример</label><select id="compose-reference"></select>
+      <img id="compose-reference-image" class="preview" alt="Авторская композиция" hidden>
+    </div>
+    <div class="inline">
+      <label>Формат<select id="format">
+        <option value="landscape">Горизонтальный · 1200 × 800</option><option value="square">Квадрат · 1000 × 1000</option>
+        <option value="portrait">Вертикальный · 800 × 1200</option>
+      </select></label>
+      <label>Палитра<select id="palette"></select></label>
+    </div>
+    <button id="compose-preview" disabled>Показать перед созданием</button>
+    <img id="compose-preview-image" class="preview" alt="Предпросмотр вашей композиции" hidden>
     <button id="scene-new" style="width:100%;margin-top:12px">Пустой холст для ручной сборки</button>
   </section>
 

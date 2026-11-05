@@ -1,14 +1,23 @@
 import { element, fillSelect } from "./dom.js";
+import { mountCompositionItems } from "./compose-items.js";
 
 export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette }) {
   const ui = { primary: element("primary"),
     secondary: element("secondary"),
-    size: element("size"),
-    secondaryRole: element("secondary-role"),
     layout: element("layout"),
     format: element("format"),
     palette: element("palette"),
     create: element("create") };
+  const items = mountCompositionItems(send);
+  let assets = [];
+  let previewRequestId = 0;
+  let previewBusy = false;
+  let referencesLoaded = false;
+  const previewButton = element("compose-preview");
+  const previewImage = element("compose-preview-image");
+  const reference = element("compose-reference");
+  const examplePanel = element("compose-example-panel");
+  const referenceImage = element("compose-reference-image");
 
   let compositionBusy = false;
   let namesTimer;
@@ -23,6 +32,7 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
     element("metaphor-pick").disabled = false;
     element("metaphor-feedback").textContent = "";
     metaphorSelectionEdited = false;
+    items.show([], assets);
     updateCreateButton();
   }
   element("metaphor-query").oninput = () => {
@@ -47,6 +57,7 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
       ? Boolean(element("metaphor-query").value.trim())
       : mode !== "manual" ? namesValid : Boolean(ui.primary.value && ui.secondary.value);
     ui.create.disabled = compositionBusy || metaphorBusy || !ready;
+    previewButton.disabled = ui.create.disabled || previewBusy;
   }
 
   function requestNames() {
@@ -59,7 +70,7 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
     }
     element("names-feedback").textContent = "Проверяем названия…";
     send({ type: "resolve-names", names: element("object-names").value,
-      size: ui.size.value, secondaryRole: ui.secondaryRole.value });
+      size: "L", secondaryRole: "auto" });
   }
   element("object-names").oninput = () => {
     if (element("compose-mode").value === "metaphor") metaphorSelectionEdited = true;
@@ -75,39 +86,78 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
     element("names-selection").hidden = !named ||
       (element("compose-mode").value === "metaphor" && !element("object-names").value.trim());
     element("manual-selection").hidden = named;
-    element("secondary-role-label").textContent = named ? "Дополнительные предметы" : "Второй предмет";
+    if (!named) showManualItems();
     updateCreateButton();
     if (named) requestNames();
   };
-  ui.size.onchange = requestNames;
-  ui.secondaryRole.onchange = requestNames;
+  function showManualItems() {
+    items.show([{ id: ui.primary.value, role: "main", size: "L" },
+      { id: ui.secondary.value, role: "background", size: "L" }].filter(item => item.id), assets);
+    updateCreateButton();
+  }
+  ui.primary.onchange = ui.secondary.onchange = showManualItems;
+
+  function loadReferences() {
+    if (!referencesLoaded) send({ type: "scene-style-list" });
+  }
+  element("compose-background").onchange = element("compose-decoration").onchange = () => {
+    examplePanel.hidden = !["compose-background", "compose-decoration"].some(id => element(id).value === "reference");
+    if (!examplePanel.hidden) loadReferences();
+  };
+  function previewReference() {
+    referenceImage.hidden = true;
+    updateCreateButton();
+    if (reference.value) send({ type: "compose-reference-preview", referenceId: reference.value });
+  }
+  reference.onchange = previewReference;
 
   element("scene-new").onclick = () => {
     const dimensions = { landscape: [1200, 800], square: [1000, 1000], portrait: [800, 1200] }[ui.format.value];
     send({ type: "scene-new", width: dimensions[0], height: dimensions[1], palette: ui.palette.value });
   };
 
-  ui.create.onclick = () => {
-    compositionBusy = true;
-    ui.create.disabled = true;
-    setStatus("Создаём композицию…");
+  function request(type) {
+    const settings = items.read();
+    if (!settings) return;
+    const mode = element("compose-mode").value;
+    const background = element("compose-background").value;
+    const decoration = element("compose-decoration").value;
+    if ((background === "reference" || decoration === "reference") && !reference.value) {
+      examplePanel.hidden = false;
+      loadReferences();
+      setStatus("Выберите авторский пример для оформления.");
+      return;
+    }
+    if (type === "preview-composition") previewBusy = true;
+    else compositionBusy = true;
+    updateCreateButton();
+    setStatus(type === "create" ? "Создаём композицию…" : "Готовим предпросмотр…");
     send({
-      type: "create", primaryId: ui.primary.value, secondaryId: ui.secondary.value,
-      mode: element("compose-mode").value === "metaphor" && metaphorSelectionEdited
-        ? "names" : element("compose-mode").value,
+      type, requestId: ++previewRequestId, primaryId: ui.primary.value, secondaryId: ui.secondary.value,
+      mode: mode === "metaphor" && (metaphorSelectionEdited || settings.itemSettings.length) ? "names" : mode,
       query: element("metaphor-query").value, names: element("object-names").value,
-      size: ui.size.value, secondaryRole: ui.secondaryRole.value,
+      size: "L", secondaryRole: "auto", ...settings,
       layout: ui.layout.value, format: ui.format.value,
-      palette: ui.palette.value
+      palette: ui.palette.value, background, decoration, referenceId: reference.value
     });
+  }
+  ui.create.onclick = () => request("create");
+  previewButton.onclick = () => request("preview-composition");
+  const invalidatePreview = () => {
+    previewImage.hidden = true;
+    previewBusy = false;
+    previewRequestId++;
+    updateCreateButton();
   };
+  element("compose").oninput = invalidatePreview;
+  element("compose").onchange = invalidatePreview;
 
   ui.palette.onchange = () => choosePalette(ui.palette.value);
 
   function receive(message) {
     switch (message.type) {
       case "ready": {
-        const assets = message.assets;
+        assets = message.assets;
         element("available-names").textContent = assets.map(asset => asset.name).join(", ");
         fillSelect(ui.primary, assets.filter(asset => asset.variants.some(item => item.active && item.role === "main"))
           .map(asset => ({ value: asset.id, label: asset.name })));
@@ -116,6 +166,7 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
         if (!ui.secondary.value && assets.some(item => item.id === "coin")) ui.secondary.value = "coin";
         updateCreateButton();
         fillSelect(ui.palette, message.palettes.map(item => ({ value: item.id, label: item.name })));
+        if (element("compose-mode").value === "manual") showManualItems();
         updateCreateButton();
         requestNames();
         break;
@@ -156,9 +207,10 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
         break;
       }
       case "names-resolved": {
-        if (message.query !== element("object-names").value || message.size !== ui.size.value ||
-            message.role !== ui.secondaryRole.value) break;
+        if (message.query !== element("object-names").value || message.size !== "L" || message.role !== "auto" ||
+            element("compose-mode").value === "manual") break;
         namesValid = !message.errors.length && message.items.length > 0;
+        items.show(namesValid ? message.items : [], assets);
         if (!namesValid) compositionBusy = false;
         const feedback = element("names-feedback");
         feedback.replaceChildren();
@@ -182,12 +234,38 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
       case "created":
         setBusy(false);
         break;
+      case "scene-styles":
+        referencesLoaded = true;
+        fillSelect(reference, message.styles.map(style => ({ value: style.id, label: style.name })));
+        if (!examplePanel.hidden) previewReference();
+        break;
+      case "compose-variant-image":
+        items.receiveThumbnail(message.variantId, message.image);
+        break;
+      case "compose-reference-image":
+        if (message.referenceId !== reference.value || !message.image) break;
+        referenceImage.src = message.image;
+        referenceImage.hidden = false;
+        break;
+      case "composition-preview":
+        if (message.requestId !== previewRequestId) break;
+        previewBusy = false;
+        previewImage.src = message.image;
+        previewImage.hidden = false;
+        previewImage.scrollIntoView({ block: "nearest" });
+        updateCreateButton();
+        setStatus("Предпросмотр готов.");
+        break;
       case "error":
         if (message.operation === "resolve-metaphor" && metaphorBusy) {
           invalidateMetaphor();
           element("metaphor-feedback").textContent = message.message;
         }
-        if (message.operation === "create" || message.operation === "resolve-names") setBusy(false);
+        if (message.operation === "preview-composition") {
+          previewBusy = false;
+          updateCreateButton();
+        }
+        if (["create", "resolve-names"].includes(message.operation)) setBusy(false);
         break;
     }
   }
@@ -196,5 +274,5 @@ export function mountCompose({ send, setStatus, cancelAdjustment, choosePalette 
     compositionBusy = busy;
     updateCreateButton();
   }
-  return { receive, setBusy, setPalette: id => { ui.palette.value = id; }, preferredSize: () => ui.size.value };
+  return { receive, setBusy, setPalette: id => { ui.palette.value = id; invalidatePreview(); }, preferredSize: () => "L" };
 }

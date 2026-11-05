@@ -31,7 +31,9 @@ import type { RegistryDocument } from "./figma-registry-store.js";
 import { FigmaAssetAdapter } from "./figma-asset-adapter.js";
 import { FigmaSceneRenderer } from "./figma-scene-renderer.js";
 import { planAutomaticScene } from "./automatic-scene-planner.js";
-import { addAutomaticDecoration } from "./figma-scene-style.js";
+import { addAutomaticDecoration, applyReferenceStyle, setSceneBackground } from "./figma-scene-style.js";
+import { applyCompositionItemSettings, readCompositionItemSettings } from "./composition-item-settings.js";
+import { discoverExampleTemplates } from "./figma-example-templates.js";
 import { handleTemplateMessage } from "./template-messages.js";
 import { requestCompositionAdjustment } from "./composition-adjustments.js";
 import { postNamedCompositionResolution } from "./named-composition.js";
@@ -476,6 +478,7 @@ async function main(): Promise<void> {
     async function createComposition(
       message: Record<string, unknown>
     ): Promise<void> {
+      const preview = message.type === "preview-composition";
       const format = stringField(message, "format");
 
       if (!Object.prototype.hasOwnProperty.call(formats, format)) {
@@ -523,11 +526,10 @@ async function main(): Promise<void> {
         typeof message.names === "string" ? message.names : "", catalog, size, secondaryRole
       ) : null;
       if (named?.errors.length) {
-        if (message.mode === "metaphor") throw new Error(named.errors.join(" "));
-        return;
+        throw new Error(named.errors.join(" "));
       }
 
-      const selection = named ? named.selection.map(item => ({
+      let selection: { id: string; role: SecondaryRole; emphasis: "primary" | "secondary" }[] = named ? named.selection.map(item => ({
         id: item.asset.id.value, role: item.variant.role, emphasis: item.emphasis
       })) : [
         {
@@ -544,8 +546,21 @@ async function main(): Promise<void> {
 
       const sources: CompositionSource[] = [];
       const names: string[] = [];
+      let settings = readCompositionItemSettings(message.itemSettings);
+      if (settings.length && (settings.length !== selection.length ||
+        settings.some((item, index) => item.assetId !== selection[index]!.id))) {
+        throw new Error("Состав изменился. Проверьте настройки предметов.");
+      }
+      if (settings.length) {
+        const primaryIndex = message.primaryIndex ?? 0;
+        if (typeof primaryIndex !== "number" || !Number.isInteger(primaryIndex) ||
+          primaryIndex < 0 || primaryIndex >= selection.length) throw new Error("Выберите главный предмет.");
+        const order = [primaryIndex, ...selection.keys()].filter((index, position) => position === 0 || index !== primaryIndex);
+        selection = order.map((index, position) => ({ ...selection[index]!, emphasis: position === 0 ? "primary" : "secondary" }));
+        settings = order.map(index => settings[index]!);
+      }
 
-      for (const item of selection) {
+      for (const [index, item] of selection.entries()) {
         const asset = catalog.getById(
           AssetId.create(item.id)
         );
@@ -554,7 +569,13 @@ async function main(): Promise<void> {
           throw new Error(`Unknown asset: ${item.id}`);
         }
 
-        const variant = item.role === "auto"
+        const setting = settings[index];
+        const chosen = setting && state.registry.assets.find(entry => entry.id === item.id)?.variants
+          .find(entry => entry.id === setting.variantId && entry.active);
+        if (setting && (!chosen || (index === 0 && chosen.role !== "main"))) {
+          throw new Error(`«${asset.name}»: выберите доступный вариант предмета.`);
+        }
+        const variant = chosen ? { role: chosen.role, size: chosen.size, resourceKey: chosen.resourceKey } : item.role === "auto"
           ? activeVariant(asset, size, "background") ?? activeVariant(asset, size, "main")
           : activeVariant(asset, size, item.role);
 
@@ -586,7 +607,7 @@ async function main(): Promise<void> {
 
       const automatic = layout === "automatic"
         ? await planAutomaticScene(canvas.width, canvas.height, sources, paletteSourceNodeIds(state.palettes)) : null;
-      const scene = automatic
+      const planned = automatic
         ? automatic.scene
         : layout === "row"
         ? createRowComposition(
@@ -602,33 +623,51 @@ async function main(): Promise<void> {
             ...sources.slice(2)
           );
 
-      if (requestCompositionAdjustment(message,
+      const scene = applyCompositionItemSettings(planned, sources, settings);
+      if (!preview && requestCompositionAdjustment(message,
         (scene.shrinkSuggestions ?? []).map(item => ({
           name: catalog.getById(item.assetId)?.name ?? item.assetId.value,
           percent: Math.round(item.scale * 100)
         })), JSON.stringify(scene))) return;
 
-      const previewPage = figma.root.children.find(
-        page => page.name === "Composer Preview"
-      ) ?? figma.createPage();
-
-      previewPage.name = "Composer Preview";
-
-      await figma.setCurrentPageAsync(previewPage);
+      if (!preview) {
+        const previewPage = figma.root.children.find(page => page.name === "Composer Preview") ?? figma.createPage();
+        previewPage.name = "Composer Preview";
+        await figma.setCurrentPageAsync(previewPage);
+      }
 
       const frame = await renderer.render(
         scene,
         `${automatic?.description ?? (layout === "row" ? "Row" : "Focus")} - ${names.join(" + ")} - ${canvas.width}x${canvas.height}`,
-        palette
+        palette, false
       );
 
-      if (automatic) {
-        try {
-          await addAutomaticDecoration(frame, paletteSourceNodeIds(state.palettes), palette);
-        } catch (error) {
-          console.warn("Не удалось добавить автоматический декор", error);
+      try {
+        const background = message.background ?? "pale";
+        const decoration = message.decoration ?? "auto";
+        if (background === "reference") {
+          await applyReferenceStyle(frame, stringField(message, "referenceId"), decoration === "reference" ? "both" : "background",
+            paletteSourceNodeIds(state.palettes), palette);
+        } else {
+          setSceneBackground(frame, background, palette);
         }
+        if (decoration === "reference" && background !== "reference") {
+          await applyReferenceStyle(frame, stringField(message, "referenceId"), "decor", paletteSourceNodeIds(state.palettes), palette);
+        } else if (decoration === "auto") {
+          await addAutomaticDecoration(frame, paletteSourceNodeIds(state.palettes), palette);
+        }
+        if (preview) {
+          const bytes = await frame.exportAsync({ format: "PNG", constraint: { type: "WIDTH", value: 420 } });
+          figma.ui.postMessage({ type: "composition-preview", requestId: message.requestId,
+            image: `data:image/png;base64,${figma.base64Encode(bytes)}` });
+          frame.remove();
+          return;
+        }
+      } catch (error) {
+        frame.remove();
+        throw error;
       }
+      figma.currentPage.selection = [frame];
       figma.viewport.scrollAndZoomIntoView([frame]);
 
       figma.ui.postMessage({
@@ -857,8 +896,25 @@ async function main(): Promise<void> {
             break;
           }
 
-          case "create": {
+          case "create":
+          case "preview-composition": {
             await createComposition(message);
+            break;
+          }
+          case "compose-variant-preview": {
+            const asset = state.registry.assets.find(item => item.id === message.assetId);
+            const variant = asset?.variants.find(item => item.id === message.variantId && item.active);
+            const nodeId = variant && state.sourceNodeIds[variant.resourceKey];
+            figma.ui.postMessage({ type: "compose-variant-image", variantId: message.variantId,
+              image: nodeId ? await thumbnail(nodeId) : null });
+            break;
+          }
+          case "compose-reference-preview": {
+            const { templates } = await discoverExampleTemplates(paletteSourceNodeIds(state.palettes));
+            const template = templates.find(item => item.sourceNodeId === message.referenceId);
+            if (!template) throw new Error("Пример недоступен.");
+            figma.ui.postMessage({ type: "compose-reference-image", referenceId: template.sourceNodeId,
+              image: await thumbnail(template.sourceNodeId) });
             break;
           }
         }
