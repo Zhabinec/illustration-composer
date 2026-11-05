@@ -4,7 +4,7 @@ import { FigmaPaletteAdapter } from "./figma-palette-adapter.js";
 import { getTemplateSlots } from "./figma-template-slots.js";
 
 const namespace = "illustrationComposer";
-type EditableObject = FrameNode | GroupNode | VectorNode;
+export type EditableObject = FrameNode | GroupNode | VectorNode;
 function isEditableObject(node: SceneNode): node is EditableObject {
   return node.type === "FRAME" || node.type === "GROUP" || node.type === "VECTOR";
 }
@@ -44,8 +44,11 @@ export function postSceneEditorState(scene?: FrameNode): void {
   }
   figma.ui.postMessage({ type: "scene-state", scene: {
     id: scene.id, name: scene.name, width: scene.width, height: scene.height,
+    isTemplate: Boolean(scene.getSharedPluginData(namespace, "template-content")),
     paletteId: scene.getSharedPluginData(namespace, "palette-id"), selectedId: selectedObject?.id ?? "",
-    items: objects.map(node => ({ id: node.id, name: node.name, x: node.x, y: node.y, rotation: node.rotation }))
+    items: objects.map(node => ({ id: node.id, name: node.name, x: node.x, y: node.y, rotation: node.rotation,
+      width: node.width, height: node.height,
+      role: node.getSharedPluginData(namespace, "composition-role") === "background" ? "background" : "main" }))
   } });
 }
 

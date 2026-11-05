@@ -102,6 +102,22 @@
           <label>Поворот, °<input id="scene-rotation" type="number" step="1"></label>
         </div>
         <button id="scene-transform" style="width:100%">Применить положение</button>
+        <details>
+          <summary>Размер предмета</summary>
+          <div class="inline">
+            <label>Ширина, px<input id="scene-object-width" type="number" min="1" max="10000" step="1"></label>
+            <label>Высота, px<input id="scene-object-height" type="number" min="1" max="10000" step="1"></label>
+          </div>
+          <p class="muted">Пропорции сохраняются. Размер меняется относительно центра предмета.</p>
+          <button id="scene-resize-object" style="width:100%">Применить размер предмета</button>
+        </details>
+        <details>
+          <summary>Заменить предмет</summary>
+          <label for="scene-replace-asset">Новое изображение из библиотеки</label><select id="scene-replace-asset"></select>
+          <label for="scene-replace-size">Детализация</label><select id="scene-replace-size"></select>
+          <p id="scene-replace-help" class="muted"></p>
+          <button id="scene-replace" style="width:100%">Заменить выбранный предмет</button>
+        </details>
         <div class="inline" style="margin-top:8px">
           <button id="scene-backward">На слой ниже</button><button id="scene-forward">На слой выше</button>
         </div>
@@ -116,6 +132,19 @@
         <label>Роль<select id="scene-add-role"><option value="main">Основной</option><option value="background">Фоновый</option></select></label>
       </div>
       <button id="scene-add" style="width:100%;margin-top:8px">Добавить на этот холст</button>
+      <details id="scene-style">
+        <summary>Фон и декор</summary>
+        <label for="scene-background-choice">Фон холста</label>
+        <select id="scene-background-choice"><option value="pale">Мягкий цвет палитры</option><option value="light">Насыщенный цвет палитры</option><option value="white">Белый</option><option value="transparent">Прозрачный</option></select>
+        <button id="scene-background" style="width:100%;margin-top:8px">Применить фон</button>
+        <div id="scene-reference-controls">
+          <label for="scene-reference-choice">Оформление из примера</label><select id="scene-reference-choice"></select>
+          <label for="scene-reference-mode">Что перенести</label>
+          <select id="scene-reference-mode"><option value="both">Фон и декор</option><option value="background">Только фон</option><option value="decor">Только декор</option></select>
+          <p id="scene-style-help" class="muted">Линии и украшения добавляются отдельным слоем.</p>
+          <button id="scene-reference-style" style="width:100%" disabled>Перенести оформление</button>
+        </div>
+      </details>
       <details>
         <summary>Размер и цвета холста</summary>
         <div class="inline"><label>Ширина<input id="scene-width" type="number" min="100" max="10000"></label><label>Высота<input id="scene-height" type="number" min="100" max="10000"></label></div>
@@ -488,10 +517,42 @@
     function showSceneObject() {
       const item = editingScene?.items.find(item => item.id === element("scene-object").value);
       element("scene-object-actions").disabled = !item;
-      for (const [field, value] of [["scene-x", item?.x], ["scene-y", item?.y], ["scene-rotation", item?.rotation]]) {
+      for (const [field, value] of [["scene-x", item?.x], ["scene-y", item?.y], ["scene-rotation", item?.rotation],
+          ["scene-object-width", item?.width], ["scene-object-height", item?.height]]) {
         element(field).value = value === undefined ? "" : Math.round(value * 100) / 100;
       }
+      element("scene-replace-asset").value = "";
+      updateReplacementVariants();
     }
+    function updateReplacementVariants() {
+      const item = editingScene?.items.find(item => item.id === element("scene-object").value);
+      const asset = assets.find(asset => asset.id === element("scene-replace-asset").value);
+      const variants = asset?.variants.filter(variant => variant.active && variant.role === item?.role) ?? [];
+      fillSelect(element("scene-replace-size"), variants.map(variant => ({ value: variant.size,
+        label: variant.size === "L" ? "Подробный" : "Упрощённый" })), false);
+      if (variants.some(variant => variant.size === ui.size.value)) element("scene-replace-size").value = ui.size.value;
+      element("scene-replace").disabled = !item || !variants.length;
+      element("scene-replace-help").textContent = asset && !variants.length
+        ? `У этого предмета нет ${item?.role === "background" ? "фонового" : "основного"} варианта. Выберите другой предмет.`
+        : "Центр, поворот, роль и слой сохраняются. Новый предмет впишется в текущий размер без растяжения.";
+    }
+    element("scene-replace-asset").onchange = updateReplacementVariants;
+    element("scene-replace").onclick = () => sceneCommand("scene-replace", {
+      assetId: element("scene-replace-asset").value, size: element("scene-replace-size").value
+    });
+    element("scene-object-width").oninput = () => {
+      const item = editingScene?.items.find(item => item.id === element("scene-object").value);
+      const width = Number(element("scene-object-width").value);
+      if (item?.width > 0 && Number.isFinite(width) && width > 0) element("scene-object-height").value = Math.round(width * item.height / item.width * 100) / 100;
+    };
+    element("scene-object-height").oninput = () => {
+      const item = editingScene?.items.find(item => item.id === element("scene-object").value);
+      const height = Number(element("scene-object-height").value);
+      if (item?.height > 0 && Number.isFinite(height) && height > 0) element("scene-object-width").value = Math.round(height * item.width / item.height * 100) / 100;
+    };
+    element("scene-resize-object").onclick = () => sceneCommand("scene-resize-object", {
+      width: Number(element("scene-object-width").value)
+    });
     element("scene-object").onchange = () => { showSceneObject(); sceneCommand("scene-select"); };
     element("scene-transform").onclick = () => sceneCommand("scene-transform", {
       x: Number(element("scene-x").value), y: Number(element("scene-y").value), rotation: Number(element("scene-rotation").value)
@@ -505,6 +566,15 @@
     });
     element("scene-settings").onclick = () => sceneCommand("scene-settings", {
       width: Number(element("scene-width").value), height: Number(element("scene-height").value)
+    });
+    element("scene-background").onclick = () => sceneCommand("scene-background", {
+      background: element("scene-background-choice").value
+    });
+    element("scene-style").ontoggle = () => {
+      if (element("scene-style").open && editingScene && !editingScene.isTemplate) send({ type: "scene-style-list" });
+    };
+    element("scene-reference-style").onclick = () => sceneCommand("scene-reference-style", {
+      sourceId: element("scene-reference-choice").value, mode: element("scene-reference-mode").value
     });
     element("scene-new").onclick = () => {
       const dimensions = { landscape: [1200, 800], square: [1000, 1000], portrait: [800, 1200] }[ui.format.value];
@@ -753,6 +823,8 @@
         .map(asset => ({ value: asset.id, label: asset.name })));
       fillSelect(ui.secondary, assets.map(asset => ({ value: asset.id, label: asset.name })));
       fillSelect(element("scene-add-asset"), assets.map(asset => ({ value: asset.id, label: asset.name })));
+      fillSelect(element("scene-replace-asset"), [{ value: "", label: "Выберите новый предмет" },
+        ...assets.map(asset => ({ value: asset.id, label: asset.name }))], false);
       if (!ui.primary.value && assets.some(item => item.id === "wallet")) ui.primary.value = "wallet";
       if (!ui.secondary.value && assets.some(item => item.id === "coin")) ui.secondary.value = "coin";
       updateCreateButton();
@@ -898,6 +970,11 @@
       const message = event.data.pluginMessage;
       if (!message) return;
       switch (message.type) {
+        case "scene-styles":
+          fillSelect(element("scene-reference-choice"), message.styles.map(style => ({ value: style.id, label: style.name })));
+          element("scene-reference-style").disabled = !message.styles.length;
+          element("scene-style-help").textContent = message.styles.length ? "Линии и украшения добавляются отдельным слоем." : "Исходные примеры оформления не найдены.";
+          break;
         case "scene-state": {
           const previousId = editingScene?.id;
           editingScene = message.scene;
@@ -905,6 +982,8 @@
           element("compose-new-title").hidden = !editingScene;
           ui.create.textContent = editingScene ? "Создать новую композицию" : "Создать композицию";
           if (!editingScene) break;
+          element("scene-style").hidden = editingScene.isTemplate;
+          if (previousId !== editingScene.id && !editingScene.isTemplate && element("scene-style").open) send({ type: "scene-style-list" });
           element("scene-info").textContent = `${editingScene.name} · ${Math.round(editingScene.width)} × ${Math.round(editingScene.height)}`;
           const previousObject = element("scene-object").value;
           fillSelect(element("scene-object"), editingScene.items.map(item => ({ value: item.id, label: item.name })));

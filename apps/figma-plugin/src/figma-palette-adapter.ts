@@ -2,6 +2,10 @@ import { getSourceColorRole, sourceColors } from "@illustration-composer/core";
 import type { ColorPalette, ColorRole } from "@illustration-composer/core";
 
 export class FigmaPaletteAdapter {
+  applyToSurface(frame: FrameNode, palette: ColorPalette): void {
+    if (Array.isArray(frame.fills)) frame.fills = this.recolorPaints(frame, "fills", frame.fills, palette);
+  }
+
   apply(root: GroupNode | FrameNode | VectorNode, palette: ColorPalette): void {
     const descendants = "findAll" in root ? root.findAll(() => true) : [];
     const nodes: SceneNode[] = [root, ...descendants];
