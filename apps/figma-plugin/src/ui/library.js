@@ -1,6 +1,10 @@
 import { element, fillSelect } from "./dom.js";
 
 export function mountLibrary({ send, setStatus }) {
+  element("export-library").onclick = () => {
+    setStatus("Экспортируем исходные SVG и примеры…");
+    send({ type: "export-library" });
+  };
   const ui = {
     candidate: element("candidate"),
     candidateCount: element("candidate-count"), candidatePreview: element("candidate-preview"),

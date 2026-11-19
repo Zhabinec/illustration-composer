@@ -137,6 +137,16 @@ window.onmessage = event => {
   for (const controller of Object.values(controllers)) controller.receive(message);
 
   switch (message.type) {
+    case "library-exported": {
+      const url = URL.createObjectURL(new Blob([message.json], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "illustration-library.json";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus("Библиотека экспортирована");
+      break;
+    }
     case "ready":
       if (!activeTab && tabs.length) displayTab(tabs[0]);
       break;

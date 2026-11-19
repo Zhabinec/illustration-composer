@@ -5,6 +5,7 @@ import { handleTemplateMessage } from "./template-messages.js";
 import { exportSelectedComposition } from "./figma-svg-export.js";
 import { handleSceneMessage } from "./scene-messages.js";
 import { postSceneEditorState, getEditableScene } from "./figma-scene-editor.js";
+import { exportVectorLibrary } from "./export-library.js";
 
 async function main(): Promise<void> {
   try {
@@ -45,6 +46,10 @@ async function main(): Promise<void> {
         })) return;
 
         switch (message.type) {
+          case "export-library": {
+            figma.ui.postMessage({ type: "library-exported", json: await exportVectorLibrary(state) });
+            break;
+          }
           case "resize-ui": {
             if (typeof message.width === "number" && typeof message.height === "number" &&
                 Number.isFinite(message.width) && Number.isFinite(message.height)) {

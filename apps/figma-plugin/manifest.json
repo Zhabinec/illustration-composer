@@ -1,6 +1,6 @@
 
 {
-  "name": "Illustration Composer",
+  "name": "Illustration Composer · Web Export",
   "api": "1.0.0",
   "main": "dist/code.js",
   "editorType": ["figma"],
