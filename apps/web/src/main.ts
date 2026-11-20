@@ -8,6 +8,7 @@ import { arrange, newElement, pickObjects, compositionSubjects } from "./composi
 import { artwork, downloadText, importedVariant, sceneSvg } from "./svg";
 import { createId, elementHeight, findVariant, type Scene, type SceneElement, type VectorAsset } from "./model";
 import { SceneHistory } from "./history";
+import { historyShortcut } from "./history-shortcuts";
 import { arrangeDecorations, decorationName, decorationVariant, newDecoration, prepareDecorationAssets, isDecoration, uniqueDecorations } from "./decorations";
 import { resizeElement } from "./resize-element";
 import { restoreProject, saveProject, validateLibrary, validateProject, type LibraryTemplate, type Project } from "./storage";
@@ -390,8 +391,8 @@ $("duplicate").onclick = () => commit(() => {
   selected = duplicate.id;
 });
 $("delete").onclick = () => commit(() => { scene.elements = scene.elements.filter(item => item.id !== selected); selected = undefined; });
-$("undo").onclick = () => { const previous = history.undo(scene); if (previous) { scene = previous; render(); persist(); } };
-$("redo").onclick = () => { const next = history.redo(scene); if (next) { scene = next; render(); persist(); } };
+$("undo").onclick = () => { const previous = history.undo(scene); if (previous) { scene = previous; render(); renderLibrary(); persist(); } };
+$("redo").onclick = () => { const next = history.redo(scene); if (next) { scene = next; render(); renderLibrary(); persist(); } };
 $("export").onclick = () => guarded(() => {
   const svg = sceneSvg(scene, assets, palette());
   svg.querySelectorAll("[data-element]").forEach(node => node.removeAttribute("data-element"));
@@ -458,9 +459,13 @@ input("import-palette").onchange = async () => {
   input("import-palette").value = "";
 };
 window.addEventListener("keydown", event => {
-  if ((event.target as Element).closest("input,textarea,select")) return;
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); $(event.shiftKey ? "redo" : "undo").click(); }
-  else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") { event.preventDefault(); $("duplicate").click(); }
+  if (event.defaultPrevented) return;
+  const target = event.target instanceof Element ? event.target : null;
+  const editingText = Boolean(target?.closest('textarea,input:not([type=number]):not([type=range]):not([type=color]):not([type=checkbox]),[contenteditable="true"]'));
+  const command = historyShortcut(event, editingText);
+  if (command) { event.preventDefault(); $(command).click(); return; }
+  if (target?.closest("input,textarea,select,[contenteditable=true]")) return;
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") { event.preventDefault(); $("duplicate").click(); }
   else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); $("export").click(); }
   else if (event.key === "Delete" || event.key === "Backspace") { event.preventDefault(); $("delete").click(); }
   else if (event.key === "Escape") selectElement(undefined);
