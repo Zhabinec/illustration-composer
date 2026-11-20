@@ -44,7 +44,8 @@ function persist(): void {
   const included = new Set(scene.elements.map(item => item.assetId));
   const custom = assets.filter(asset => included.has(asset.id) || asset.id.startsWith("upload-"));
   const okay = saveProject({ version: 1, scene, assets: custom, palettes });
-  $("save-note").textContent = okay ? "Изменения сохранены" : "Сохраните проект файлом";
+  $("save-note").textContent = okay ? "" : "Сохраните проект файлом";
+  $("save-note").hidden = okay;
 }
 function commit(action: () => void): void {
   history.record(scene);
@@ -138,7 +139,8 @@ function renderCanvas(): void {
   svg.onpointerdown = event => { if (!(event.target as Element).closest("[data-element]")) selectElement(undefined); };
   $("canvas-mount").replaceChildren(svg);
   $("canvas-size").textContent = scene.width + " × " + scene.height;
-  $("canvas-hint").innerHTML = icon("info") + (scene.elements.length ? " Перетаскивайте предметы прямо на холсте" : " Добавьте первый предмет из библиотеки");
+  $("canvas-hint").textContent = "Добавьте предмет из библиотеки";
+  $("canvas-hint").hidden = scene.elements.length > 0;
   fitCanvas();
 }
 function fitCanvas(): void {
@@ -274,7 +276,7 @@ $("generate").onclick = () => guarded(() => {
     automaticDecor();
     selected = items[0]?.id;
   });
-  feedback("Композиция собрана. Вы можете изменить каждый предмет.");
+  feedback("Композиция собрана.");
 });
 $("rearrange").onclick = () => guarded(() => commit(layoutObjects));
 $("search").oninput = renderLibrary;
@@ -283,8 +285,8 @@ document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(button => {
     libraryTab = button.dataset.tab!;
     document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(tab => tab.setAttribute("aria-pressed", String(tab === button)));
     input("search").value = "";
-    $("library-help").textContent = libraryTab === "templates" ? "Готовая расстановка. Каждый элемент можно изменить."
-      : libraryTab === "decor" ? "Линии, точки и украшения из исходных иллюстраций." : "Нажмите на предмет, чтобы добавить его на холст.";
+    $("library-help").textContent = libraryTab === "templates" ? "Готовые композиции для редактирования."
+      : libraryTab === "decor" ? "Линии, точки и украшения." : "Предметы для вашей композиции.";
     renderLibrary();
   };
 });
@@ -350,7 +352,7 @@ $("export").onclick = () => guarded(() => {
   const svg = sceneSvg(scene, assets, palette());
   svg.querySelectorAll("[data-element]").forEach(node => node.removeAttribute("data-element"));
   downloadText(new XMLSerializer().serializeToString(svg), "illustration-" + scene.width + "x" + scene.height + ".svg", "image/svg+xml");
-  feedback("SVG сохранён. Предметы остаются отдельными векторными группами.");
+  feedback("SVG подготовлен к скачиванию.");
 });
 $("save-project").onclick = () => {
   const used = new Set(scene.elements.map(item => item.assetId));
@@ -366,7 +368,7 @@ input("import-svg").onchange = async () => {
     const asset = { id: "upload-" + createId(), name: file.name.replace(/\.svg$/i, ""), variants: [variant] };
     commit(() => { assets.push(asset); const item = newElement(asset, scene.width); scene.elements.push(item); selected = item.id; });
     renderLibrary();
-    feedback("Предмет добавлен в библиотеку и на холст.");
+    feedback("Предмет добавлен.");
   } catch (error) { feedback(String(error instanceof Error ? error.message : error), true); }
   input("import-svg").value = "";
 };
@@ -407,7 +409,7 @@ input("import-palette").onchange = async () => {
     if (palettes.some(p => p.name.toLowerCase() === resolved.name.toLowerCase())) throw new Error("Палитра с таким именем уже есть.");
     commit(() => { const p = { ...resolved, id: "palette-" + createId() }; palettes.push(p); scene.paletteId = p.id; });
     renderLibrary();
-    feedback("Палитра добавлена и применена.");
+    feedback("Палитра применена.");
   } catch (error) { feedback(error instanceof Error ? error.message : String(error), true); }
   input("import-palette").value = "";
 };

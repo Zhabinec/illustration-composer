@@ -5,13 +5,13 @@
   background: var(--paper);
   --ink: #171717;
   --paper: #fff;
-  --surface: #f1f1ee;
+  --surface: var(--paper);
   --accent: #d8271c;
-  --accent-hover: #b51c13;
-  --accent-soft: #fff0ed;
-  --border: #d5d5d0;
-  --muted: #62625c;
-  --focus: #1747bb;
+  --accent-hover: var(--ink);
+  --accent-soft: var(--paper);
+  --border: var(--ink);
+  --muted: var(--ink);
+  --focus: var(--accent);
   --control: 2.75rem;
   --space: 1.5rem
 }
@@ -110,7 +110,7 @@ h1,h2,p {
 }
 
 h1 {
-  font-size: clamp(1.875rem,2.1vw,2.75rem);
+  font-size: 1.25rem;
   line-height: 1.02;
   font-weight: 700;
   letter-spacing: -.065em
@@ -159,18 +159,7 @@ h2 {
   padding-right: .125rem
 }
 
-.header-divider {
-  height: 2rem;
-  border-left: 1px solid var(--border)
-}
-
-.header-caption {
-  font-size: .875rem;
-  color: var(--muted)
-}
-
 .save-note {
-  margin-left: auto;
   font-size: .75rem;
   color: var(--muted)
 }
@@ -439,22 +428,6 @@ textarea {
   padding: 1.75rem 2rem 1rem
 }
 
-.eyebrow {
-  display: block;
-  color: var(--muted);
-  font-size: .75rem;
-  font-weight: 600;
-  letter-spacing: .12em;
-  margin-bottom: .875rem
-}
-
-.canvas-title {
-  font-size: clamp(2rem,3.6vw,4rem);
-  line-height: 1;
-  letter-spacing: -.065em;
-  margin-bottom: .5rem
-}
-
 #canvas-size {
   display: block;
   font-size: .875rem;
@@ -527,7 +500,7 @@ textarea {
   border-top: 1px solid var(--border)
 }
 
-.canvas-footer span,.canvas-footer label {
+.canvas-footer span:not([hidden]),.canvas-footer label {
   display: flex;
   align-items: center;
   gap: .5rem
@@ -688,9 +661,6 @@ textarea {
   :root {
     --space: 1rem
   }
-  .header-caption,.header-divider,.save-note {
-    display: none
-  }
   .topbar .quiet {
     margin-left: auto
   }
@@ -699,9 +669,6 @@ textarea {
   }
   .canvas-toolbar {
     padding: 1.5rem 1.25rem 1rem
-  }
-  .canvas-title {
-    font-size: 2.25rem
   }
   #canvas-viewport {
     padding: 1.25rem
@@ -733,9 +700,6 @@ textarea {
   }
   .canvas-toolbar {
     padding-block: 1.25rem .5rem
-  }
-  .canvas-title {
-    font-size: 2rem
   }
   .canvas-footer {
     padding: .75rem 1rem
@@ -795,3 +759,9 @@ textarea {
     transition: none!important
   }
 }
+
+.topbar > .quiet { margin-left: auto; }
+.feedback:empty { display: none; }
+.canvas-toolbar h2 { margin-bottom: .375rem; }
+.canvas-footer > label { margin-left: auto; }
+.layer-item.selected { color: var(--accent); }
