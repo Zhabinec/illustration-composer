@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: illustration-composer
+    runtime: static
+    repo: https://github.com/Zhabinec/illustration-composer
+    branch: codex/web-app
+    buildCommand: npm ci --include=dev && npm run build -w @illustration-composer/core && npm run build -w @illustration-composer/web
+    staticPublishPath: apps/web/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
