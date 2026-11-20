@@ -11,7 +11,7 @@ export const workspaceView = `
   <main class="workspace">
     <aside class="library-panel">
       <section class="create-panel">
-        <div class="section-heading"><h1>От идеи<br>к иллюстрации.</h1><span class="tiny-tag">SVG</span></div>
+        <div class="section-heading"><h1>От идеи<br>к иллюстрации.</h1></div>
         <p class="muted">Тема, предметы, композиция.<br>Всё на одном холсте.</p>
         <div class="segmented" aria-label="Способ подбора"><button id="mode-metaphor" aria-pressed="true">По теме</button><button id="mode-names" aria-pressed="false">По предметам</button></div>
         <label for="query" id="query-label">О чём будет иллюстрация?</label>
