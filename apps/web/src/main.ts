@@ -4,10 +4,12 @@ import { palettePresets, resolvePalette, type ColorPalette } from "@illustration
 import source from "./library.json";
 import { canvasFormats } from "../../figma-plugin/src/canvas-formats";
 import { icon } from "./icons";
-import { arrange, newElement, pickObjects } from "./composition";
+import { arrange, newElement, pickObjects, compositionSubjects } from "./composition";
 import { artwork, downloadText, importedVariant, sceneSvg } from "./svg";
 import { createId, elementHeight, findVariant, type Scene, type SceneElement, type VectorAsset } from "./model";
 import { SceneHistory } from "./history";
+import { arrangeDecorations, decorationName, decorationVariant, newDecoration, prepareDecorationAssets, isDecoration } from "./decorations";
+import { resizeElement } from "./resize-element";
 import { restoreProject, saveProject, validateLibrary, validateProject, type LibraryTemplate, type Project } from "./storage";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -20,6 +22,7 @@ if (saved) {
   const ids = new Set(saved.assets.map(asset => asset.id));
   assets = [...assets.filter(asset => !ids.has(asset.id)), ...saved.assets];
 }
+assets = prepareDecorationAssets(assets);
 let palettes: ColorPalette[] = [...Object.values(palettePresets), ...(saved?.palettes ?? []).filter(p => !palettePresets[p.id])];
 let scene: Scene = saved?.scene ?? { width: 1200, height: 800, paletteId: "original", background: "light", elements: [] };
 let selected: string | undefined;
@@ -48,9 +51,11 @@ function persist(): void {
   $("save-note").hidden = okay;
 }
 function commit(action: () => void): void {
+  const previousSelection = selected;
   history.record(scene);
   action();
   render();
+  if (selected !== previousSelection) $("object-controls").closest("aside")?.scrollTo({ top: 0 });
   persist();
 }
 function optionList(select: HTMLSelectElement, entries: { value: string; label: string }[], value?: string): void {
@@ -58,7 +63,7 @@ function optionList(select: HTMLSelectElement, entries: { value: string; label: 
   if (value !== undefined) select.value = value;
 }
 function thumbnail(asset: VectorAsset, index: number): SVGSVGElement {
-  const variant = asset.variants.find(v => v.size === "S" && v.role === "main") ?? asset.variants[0]!;
+  const variant = isDecoration(asset.id) ? decorationVariant(asset) : asset.variants.find(v => v.size === "S" && v.role === "main") ?? asset.variants[0]!;
   const svg = artwork(variant, palette(), "thumb-" + index);
   svg.removeAttribute("width");
   svg.removeAttribute("height");
@@ -97,11 +102,8 @@ function renderLibrary(): void {
       button.title = "Добавить " + label.textContent;
       button.onclick = () => commit(() => {
         if (scene.elements.length >= 200) throw new Error("На холсте уже 200 элементов.");
-        const element = newElement(asset, scene.width);
-        if (libraryTab === "decor") {
-          element.width = scene.width * 0.16;
-          element.name = decorationName(asset.name);
-        }
+        const element = libraryTab === "decor" ? newDecoration(asset, scene.width, scene.height) : newElement(asset, scene.width);
+        if (libraryTab === "decor") $<HTMLSelectElement>("auto-decor").value = "manual";
         scene.elements.push(element);
         selected = element.id;
       });
@@ -109,10 +111,6 @@ function renderLibrary(): void {
     });
   }
   if (!grid.children.length) grid.innerHTML = '<p class="muted small empty-library">Пока ничего не найдено.</p>';
-}
-function decorationName(name: string): string {
-  if (/line|линия/i.test(name)) return "Линия";
-  return /vector|ellipse/i.test(name) ? "Точка" : "Конфетти";
 }
 function renderCanvas(): void {
   const svg = sceneSvg(scene, assets, palette());
@@ -130,6 +128,16 @@ function renderCanvas(): void {
       outline.setAttribute("height", String(variant.height));
       outline.setAttribute("class", "selection-outline");
       group.append(outline);
+      const handle = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      const handleSize = 12 / (viewScale * item.width / variant.width);
+      handle.setAttribute("x", String(variant.width - handleSize / 2));
+      handle.setAttribute("y", String(variant.height - handleSize / 2));
+      handle.setAttribute("width", String(handleSize));
+      handle.setAttribute("height", String(handleSize));
+      handle.setAttribute("class", "resize-handle");
+      handle.setAttribute("aria-label", "Изменить размер " + item.name);
+      handle.onpointerdown = event => startResize(event, item);
+      group.append(handle);
     }
     group.onpointerdown = event => startDrag(event, item);
     group.onkeydown = event => {
@@ -155,6 +163,7 @@ function selectElement(id: string | undefined): void {
   renderCanvas();
   renderInspector();
   renderLayers();
+  $("object-controls").closest("aside")?.scrollTo({ top: 0 });
 }
 function renderInspector(): void {
   const item = current();
@@ -162,13 +171,13 @@ function renderInspector(): void {
   $("selection-empty").hidden = Boolean(item);
   $("object-title").textContent = item?.name ?? "Выбранный предмет";
   if (!item) return;
-  optionList($<HTMLSelectElement>("replace"), assets.filter(a => !/^(decor-|reference-)/.test(a.id) || a.id === item.assetId)
+  optionList($<HTMLSelectElement>("replace"), assets.filter(a => isDecoration(item.assetId) ? isDecoration(a.id) : !/^(decor-|reference-)/.test(a.id) || a.id === item.assetId)
     .map(asset => ({ value: asset.id, label: asset.name })), item.assetId);
   const asset = assets.find(asset => asset.id === item.assetId)!;
-  optionList($<HTMLSelectElement>("variant"), asset.variants.map(variant => ({
+  optionList($<HTMLSelectElement>("variant"), (isDecoration(asset.id) ? [decorationVariant(asset)] : asset.variants).map(variant => ({
     value: variant.id, label: variant.size + " · " + (variant.role === "main" ? "цветной рисунок" : "в цветах фона")
   })), item.variantId);
-  for (const [field, value] of [["x", item.x], ["y", item.y], ["width", item.width], ["rotation", item.rotation]] as const) {
+  for (const [field, value] of [["x", item.x], ["y", item.y], ["width", item.width], ["height", elementHeight(item, findVariant(assets, item))], ["rotation", item.rotation]] as const) {
     input("object-" + field).value = String(Math.round(value * 100) / 100);
   }
 }
@@ -240,22 +249,39 @@ function layoutObjects(): void {
 }
 function automaticDecor(): void {
   const choice = $<HTMLSelectElement>("auto-decor").value;
-  if (choice === "none") {
-    scene.elements = scene.elements.filter(item => !item.assetId.startsWith("decor-"));
-    return;
-  }
-  if (choice !== "auto" || scene.elements.some(item => item.assetId.startsWith("decor-"))) return;
-  const template = [...templates].filter(template => template.elements.some(item => item.assetId.startsWith("decor-")))
-    .sort((a, b) => Math.abs(Math.log(a.width / a.height / (scene.width / scene.height))) -
-      Math.abs(Math.log(b.width / b.height / (scene.width / scene.height))))[0];
-  if (!template) return;
-  const scale = Math.min(scene.width / template.width, scene.height / template.height);
-  const x = (scene.width - template.width * scale) / 2;
-  const y = (scene.height - template.height * scale) / 2;
-  scene.elements.unshift(...template.elements.filter(item => item.assetId.startsWith("decor-")).map(item => ({
-    ...item, id: createId(), name: decorationName(item.name),
-    x: x + item.x * scale, y: y + item.y * scale, width: item.width * scale
-  })));
+  if (choice === "manual") return;
+  const subjects = scene.elements.filter(item => !isDecoration(item.assetId));
+  scene.elements = choice === "none" ? subjects : [...arrangeDecorations(subjects, assets, scene.width, scene.height), ...subjects];
+}
+function startResize(event: PointerEvent, item: SceneElement): void {
+  if (event.button !== 0) return;
+  event.preventDefault(); event.stopPropagation();
+  const initial = { ...item };
+  const variant = findVariant(assets, item);
+  const x = event.clientX, y = event.clientY, scale = viewScale;
+  history.record(scene);
+  const move = (event: PointerEvent) => {
+    Object.assign(item, resizeElement(initial, variant, (event.clientX - x) / scale, (event.clientY - y) / scale));
+    renderCanvas(); renderInspector();
+  };
+  const end = () => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", end);
+    window.removeEventListener("pointercancel", end);
+    persist();
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
+}
+function showLibrary(tab: string): void {
+  libraryTab = tab;
+  document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.tab === tab)));
+  input("search").value = "";
+  $("library-help").textContent = tab === "templates" ? "Готовые композиции для редактирования."
+    : tab === "decor" ? "Линии, точки и украшения." : "Предметы для вашей композиции.";
+  renderLibrary();
+  $("asset-grid").scrollIntoView({ block: "nearest" });
 }
 
 optionList($<HTMLSelectElement>("format"), [...Object.entries(canvasFormats).map(([value, item]) =>
@@ -271,24 +297,24 @@ $("generate").onclick = () => guarded(() => {
   if (!chosen.length || chosen.length > 8) throw new Error("Укажите от 1 до 8 предметов.");
   commit(() => {
     const decor = scene.elements.filter(item => item.assetId.startsWith("decor-"));
-    const items = chosen.map(asset => newElement(asset, scene.width));
+    const items = compositionSubjects(chosen, scene.width, input("generation-depth").checked);
     scene.elements = [...decor, ...arrange(items, assets, scene.width, scene.height, $<HTMLSelectElement>("layout").value)];
     automaticDecor();
     selected = items[0]?.id;
   });
   feedback("Композиция собрана.");
 });
-$("rearrange").onclick = () => guarded(() => commit(layoutObjects));
+$("rearrange").onclick = () => guarded(() => commit(() => { layoutObjects(); automaticDecor(); }));
 $("search").oninput = renderLibrary;
 document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(button => {
-  button.onclick = () => {
-    libraryTab = button.dataset.tab!;
-    document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach(tab => tab.setAttribute("aria-pressed", String(tab === button)));
-    input("search").value = "";
-    $("library-help").textContent = libraryTab === "templates" ? "Готовые композиции для редактирования."
-      : libraryTab === "decor" ? "Линии, точки и украшения." : "Предметы для вашей композиции.";
-    renderLibrary();
-  };
+  button.onclick = () => showLibrary(button.dataset.tab!);
+});
+$("add-subject").onclick = () => showLibrary("objects");
+$("add-decor").onclick = () => showLibrary("decor");
+$("next-layout").onclick = () => guarded(() => {
+  const layout = $<HTMLSelectElement>("layout");
+  layout.selectedIndex = (layout.selectedIndex + 1) % layout.options.length;
+  commit(() => { layoutObjects(); automaticDecor(); });
 });
 $("format").onchange = () => guarded(() => {
   const format = canvasFormats[$<HTMLSelectElement>("format").value as keyof typeof canvasFormats];
@@ -312,13 +338,29 @@ for (const name of ["x", "y", "width", "rotation"] as const) $("object-" + name)
   if (!current() || !field.reportValidity() || !Number.isFinite(field.valueAsNumber)) return;
   commit(() => { current()![name] = field.valueAsNumber; });
 });
+$("object-height").onchange = () => guarded(() => {
+  const item = current();
+  const field = input("object-height");
+  if (!item || !field.reportValidity() || !Number.isFinite(field.valueAsNumber)) return;
+  commit(() => { const v = findVariant(assets, item); item.width = field.valueAsNumber * v.width / v.height; });
+});
+for (const [id, factor] of [["shrink-object", .8], ["grow-object", 1.25]] as const) $(id).onclick = () => {
+  if (current()) commit(() => { current()!.width = Math.max(1, current()!.width * factor); });
+};
 $("apply-object").onclick = () => guarded(() => {
   const item = current();
   if (!item) return;
   const fields = ["x", "y", "width", "rotation"] as const;
   const values = fields.map(name => input("object-" + name).valueAsNumber);
   if (!fields.every(name => input("object-" + name).reportValidity()) || !values.every(Number.isFinite)) return;
-  commit(() => fields.forEach((name, index) => { item[name] = values[index]!; }));
+  const heightField = input("object-height");
+  if (!heightField.reportValidity() || !Number.isFinite(heightField.valueAsNumber)) return;
+  const previousHeight = Math.round(elementHeight(item, findVariant(assets, item)) * 100) / 100;
+  const heightChanged = heightField.valueAsNumber !== previousHeight;
+  commit(() => {
+    fields.forEach((name, index) => { item[name] = values[index]!; });
+    if (heightChanged) { const v = findVariant(assets, item); item.width = heightField.valueAsNumber * v.width / v.height; }
+  });
 });
 $("replace").onchange = () => guarded(() => commit(() => {
   const item = current();
@@ -326,7 +368,7 @@ $("replace").onchange = () => guarded(() => commit(() => {
   if (!item || !asset) return;
   const variant = findVariant(assets, item);
   item.assetId = asset.id;
-  item.variantId = (asset.variants.find(v => v.size === variant.size && v.role === variant.role) ?? asset.variants[0]!).id;
+  item.variantId = (isDecoration(asset.id) ? decorationVariant(asset) : asset.variants.find(v => v.size === variant.size && v.role === variant.role) ?? asset.variants[0]!).id;
   item.name = asset.name;
 }));
 $("variant").onchange = () => commit(() => { if (current()) current()!.variantId = $<HTMLSelectElement>("variant").value; });
@@ -382,7 +424,7 @@ input("import-json").onchange = async () => {
       const project = validateProject(value);
       commit(() => {
         const ids = new Set(project.assets.map(item => item.id));
-        assets = [...assets.filter(item => !ids.has(item.id)), ...project.assets];
+        assets = prepareDecorationAssets([...assets.filter(item => !ids.has(item.id)), ...project.assets]);
         palettes = project.palettes;
         scene = project.scene;
       });
@@ -390,7 +432,7 @@ input("import-json").onchange = async () => {
       const library = validateLibrary(value);
       commit(() => {
         const ids = new Set(library.assets.map(item => item.id));
-        assets = [...assets.filter(item => !ids.has(item.id)), ...library.assets];
+        assets = prepareDecorationAssets([...assets.filter(item => !ids.has(item.id)), ...library.assets]);
         templates = library.templates ?? templates;
       });
     }

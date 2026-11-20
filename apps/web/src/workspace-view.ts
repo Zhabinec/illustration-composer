@@ -14,7 +14,11 @@ export const workspaceView = `
         <div class="segmented" aria-label="Способ подбора"><button id="mode-metaphor" aria-pressed="true">По теме</button><button id="mode-names" aria-pressed="false">По предметам</button></div>
         <label for="query" id="query-label">О чём будет иллюстрация?</label>
         <textarea id="query" rows="3" maxlength="1000" placeholder="Например, финансовая безопасность"></textarea>
+        <label for="layout">Расстановка</label><select id="layout"><option value="automatic">Автоматически</option><option value="focus">Главный в центре</option><option value="left">Главный слева</option><option value="right">Главный справа</option><option value="diagonal">По диагонали</option><option value="row">В ряд</option></select>
+        <label class="check-field"><input id="generation-depth" type="checkbox" checked> Последний предмет — фоновый</label>
         <button class="primary full" id="generate">${icon("spark")} Собрать композицию</button>
+        <div class="two-fields composition-actions"><button id="add-subject">${icon("plus")} Предмет</button><button id="add-decor">${icon("plus")} Декор</button></div>
+        <button id="next-layout" class="full secondary">Другая расстановка</button>
         <p id="feedback" class="feedback" aria-live="polite"></p>
       </section>
       <section class="assets-section">
@@ -32,6 +36,21 @@ export const workspaceView = `
       <div class="canvas-footer"><span id="canvas-hint" hidden></span><label>Масштаб <select id="zoom"><option value="75">75%</option><option value="100" selected>По размеру окна</option><option value="125">125%</option><option value="150">150%</option></select></label></div>
     </section>
     <aside class="inspector-panel">
+      <section class="object-section"><div class="section-heading"><h2 id="object-title">Выбранный предмет</h2><span class="selection-dot"></span></div>
+        <p id="selection-empty" class="muted">Выберите предмет на холсте.</p>
+        <div id="object-controls" hidden>
+          <label for="replace">Заменить предмет</label><select id="replace"></select>
+          <label for="variant">Рисунок из библиотеки</label><select id="variant"></select>
+          <div class="two-fields"><label>X, px<input id="object-x" type="number" step="any"></label><label>Y, px<input id="object-y" type="number" step="any"></label></div>
+          <div class="two-fields"><label>Ширина, px<input id="object-width" type="number" min="1" step="any"></label><label>Высота, px<input id="object-height" type="number" min="1" step="any"></label></div>
+          <label>Поворот, °<input id="object-rotation" type="number" step="any"></label>
+          <div class="two-fields"><button id="shrink-object">Уменьшить</button><button id="grow-object">Увеличить</button></div>
+          <button id="apply-object" class="full secondary">Применить</button>
+          <div class="two-fields layer-actions"><button id="backward">На слой ниже</button><button id="forward">На слой выше</button></div>
+          <div class="two-fields"><button id="to-back">Позади всех</button><button id="to-front">Впереди всех</button></div>
+          <div class="two-fields object-actions"><button id="duplicate">${icon("copy")} Дублировать</button><button id="delete" class="danger">${icon("trash")} Удалить</button></div>
+        </div>
+      </section>
       <section><div class="section-heading"><h2>Оформление</h2>${icon("grid")}</div>
         <label for="format">Формат холста</label><select id="format"></select>
         <div class="two-fields"><label>Ширина, px<input id="canvas-width" type="number" min="100" max="10000"></label><label>Высота, px<input id="canvas-height" type="number" min="100" max="10000"></label></div>
@@ -40,21 +59,7 @@ export const workspaceView = `
         <label for="background">Фон холста</label><div class="background-control"><select id="background"><option value="light">Цвет палитры</option><option value="pale">Светлый цвет палитры</option><option value="#FFFFFF">Белый</option><option value="transparent">Прозрачный</option><option value="custom">Свой цвет</option></select><input id="background-color" type="color" aria-label="Свой цвет фона"></div>
         <label for="auto-decor">Декор при сборке</label><select id="auto-decor"><option value="auto">Подобрать из примеров</option><option value="manual">Добавлю вручную</option><option value="none">Без декора</option></select>
       </section>
-      <section class="object-section"><div class="section-heading"><h2 id="object-title">Выбранный предмет</h2><span class="selection-dot"></span></div>
-        <p id="selection-empty" class="muted">Выберите предмет на холсте.</p>
-        <div id="object-controls" hidden>
-          <label for="replace">Заменить предмет</label><select id="replace"></select>
-          <label for="variant">Рисунок из библиотеки</label><select id="variant"></select>
-          <div class="two-fields"><label>X, px<input id="object-x" type="number" step="any"></label><label>Y, px<input id="object-y" type="number" step="any"></label></div>
-          <div class="two-fields"><label>Ширина, px<input id="object-width" type="number" min="1" step="any"></label><label>Поворот, °<input id="object-rotation" type="number" step="any"></label></div>
-          <button id="apply-object" class="full secondary">Применить</button>
-          <div class="two-fields layer-actions"><button id="backward">На слой ниже</button><button id="forward">На слой выше</button></div>
-          <div class="two-fields"><button id="to-back">Позади всех</button><button id="to-front">Впереди всех</button></div>
-          <div class="two-fields object-actions"><button id="duplicate">${icon("copy")} Дублировать</button><button id="delete" class="danger">${icon("trash")} Удалить</button></div>
-        </div>
-      </section>
       <section><div class="section-heading"><h2>Расстановка</h2>${icon("layers")}</div>
-        <label for="layout">Как расположить предметы</label><select id="layout"><option value="automatic">Подобрать автоматически</option><option value="focus">Главный крупнее</option><option value="row">Слева направо</option></select>
         <label for="primary">Главный предмет</label><select id="primary"></select>
         <button id="rearrange" class="full secondary">${icon("spark")} Расставить заново</button>
         <div class="section-heading layers-heading"><h2>Слои</h2><span id="layer-count" class="tiny-tag">0</span></div><div id="layers"></div>

@@ -29,12 +29,26 @@ export function arrange(elements: readonly SceneElement[], assets: readonly Vect
   });
   if (!sources.length) return [];
   const scene = layout === "row" ? createRowComposition(width, height, sources)
-    : layout === "focus" ? createFocusComposition(width, height, sources[0]!, sources[1], ...sources.slice(2))
+    : ["focus", "left", "right", "diagonal"].includes(layout) ? createFocusComposition(width, height, sources[0]!, sources[1], ...sources.slice(2))
     : createAutomaticComposition(width, height, sources);
   const positioned = scene.items.map((item, index) => ({
-    ...elements[index]!, x: item.x, y: item.y, width: sources[index]!.width * item.scale, rotation: item.rotation
+    ...elements[index]!, x: layout === "right" ? width - item.x - sources[index]!.width * item.scale : item.x,
+    y: item.y, width: sources[index]!.width * item.scale,
+    rotation: layout === "diagonal" && index > 0 ? (index % 2 ? -8 : 8) : item.rotation
   }));
   return positioned.sort((a, b) => Number(findVariant(assets, a).role === "main") - Number(findVariant(assets, b).role === "main"));
+}
+
+export function compositionSubjects(chosen: readonly VectorAsset[], width: number, depth: boolean): SceneElement[] {
+  return chosen.map((asset, index) => {
+    const item = newElement(asset, width);
+    if (depth && index > 0 && index === chosen.length - 1) {
+      const background = asset.variants.find(v => v.role === "background" && v.size === "L")
+        ?? asset.variants.find(v => v.role === "background");
+      if (background) item.variantId = background.id;
+    }
+    return item;
+  });
 }
 
 export function newElement(asset: VectorAsset, canvasWidth: number): SceneElement {
