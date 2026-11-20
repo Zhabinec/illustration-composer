@@ -8,7 +8,7 @@ import { arrange, newElement, pickObjects, compositionSubjects } from "./composi
 import { artwork, downloadText, importedVariant, sceneSvg } from "./svg";
 import { createId, elementHeight, findVariant, type Scene, type SceneElement, type VectorAsset } from "./model";
 import { SceneHistory } from "./history";
-import { arrangeDecorations, decorationName, decorationVariant, newDecoration, prepareDecorationAssets, isDecoration } from "./decorations";
+import { arrangeDecorations, decorationName, decorationVariant, newDecoration, prepareDecorationAssets, isDecoration, uniqueDecorations } from "./decorations";
 import { resizeElement } from "./resize-element";
 import { restoreProject, saveProject, validateLibrary, validateProject, type LibraryTemplate, type Project } from "./storage";
 
@@ -91,8 +91,8 @@ function renderLibrary(): void {
       grid.append(button);
     }
   } else {
-    const entries = assets.filter(asset => (libraryTab === "decor" ? asset.id.startsWith("decor-") : !/^(decor-|reference-)/.test(asset.id)) &&
-      asset.name.toLowerCase().includes(search));
+    const entries = (libraryTab === "decor" ? uniqueDecorations(assets) : assets.filter(asset => !/^(decor-|reference-)/.test(asset.id)))
+      .filter(asset => (asset.name + " " + (isDecoration(asset.id) ? decorationName(asset.name) : "")).toLowerCase().includes(search));
     entries.forEach((asset, index) => {
       const button = document.createElement("button");
       button.className = "asset-card";
@@ -190,9 +190,11 @@ function renderLayers(): void {
     button.onclick = () => selectElement(item.id);
     return button;
   }));
-  optionList($<HTMLSelectElement>("primary"), scene.elements.filter(item => !item.assetId.startsWith("decor-"))
-    .map(item => ({ value: item.id, label: item.name })), $<HTMLSelectElement>("primary").value);
-  if (!$<HTMLSelectElement>("primary").value && scene.elements.length) $<HTMLSelectElement>("primary").selectedIndex = 0;
+  const subjects = scene.elements.filter(item => !isDecoration(item.assetId));
+  const previous = $<HTMLSelectElement>("primary").value;
+  const primary = subjects.some(item => item.id === previous) ? previous
+    : (subjects.find(item => findVariant(assets,item).role === "main") ?? subjects[0])?.id;
+  optionList($<HTMLSelectElement>("primary"), subjects.map(item => ({ value: item.id, label: item.name })), primary);
 }
 function render(): void {
   if (!scene.elements.some(item => item.id === selected)) selected = undefined;

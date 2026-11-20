@@ -21,6 +21,18 @@ export function decorationVariant(asset: VectorAsset): VectorVariant {
   return asset.variants.find(v => v.id.endsWith("-viewport")) ?? asset.variants[0]!;
 }
 
+export function uniqueDecorations(assets: readonly VectorAsset[]): VectorAsset[] {
+  const seen = new Set<string>();
+  return assets.filter(asset => {
+    if (!isDecoration(asset.id)) return false;
+    const key = decorationVariant(asset).svg.replace(/\s+id="[^"]*"/g, "")
+      .replace(/\d+\.\d+(?:e[+-]?\d+)?/gi, value => String(Math.round(Number(value) * 1000) / 1000));
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function newDecoration(asset: VectorAsset, width: number, height: number): SceneElement {
   const variant = decorationVariant(asset);
   return { id: createId(), assetId: asset.id, variantId: variant.id, name: decorationName(asset.name),
